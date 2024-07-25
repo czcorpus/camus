@@ -1,0 +1,17 @@
+{
+    "listenAddress": "127.0.0.1",
+    "listenPort": 8085,
+    "serverReadTimeoutSecs": 60,
+    "serverWriteTimeoutSecs": 60,
+    "corsAllowedOrigins": [],
+    "timeZone": "Europe/Prague",
+    "logLevel": "debug",
+    "redis": {
+        "host": "databases",
+        "port": 6379,
+        "db": 2,
+        "queueKey": "testing_queue"
+    },
+    "checkIntervalSecs": 10,
+    "checkIntervalChunk": 2
+}
