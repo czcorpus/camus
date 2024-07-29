@@ -10,8 +10,10 @@
         "host": "databases",
         "port": 6379,
         "db": 2,
-        "queueKey": "testing_queue"
+        "queueKey": "testing_queue",
+        "failedRecordsKey": "camus_failed_items"
     },
     "checkIntervalSecs": 10,
-    "checkIntervalChunk": 2
+    "checkIntervalChunk": 2,
+    "ddStateFilePath": "./deduplicator.bin"
 }

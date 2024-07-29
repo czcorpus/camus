@@ -47,8 +47,18 @@ type Conf struct {
 	LogFile                string              `json:"logFile"`
 	LogLevel               logging.LogLevel    `json:"logLevel"`
 	Redis                  *archiver.RedisConf `json:"redis"`
+	MySQL                  *archiver.DBConf    `json:"db"`
 	CheckIntervalSecs      int                 `json:"checkIntervalSecs"`
 	CheckIntervalChunk     int                 `json:"checkIntervalChunk"`
+	DDStateFilePath        string              `json:"ddStateFilePath"`
+}
+
+func (conf *Conf) TimezoneLocation() *time.Location {
+	// we can ignore the error here as we always call c.Validate()
+	// first (which also tries to load the location and report possible
+	// error)
+	loc, _ := time.LoadLocation(conf.TimeZone)
+	return loc
 }
 
 func LoadConfig(path string) *Conf {
@@ -88,5 +98,13 @@ func ValidateAndDefaults(conf *Conf) {
 	}
 	if _, err := time.LoadLocation(conf.TimeZone); err != nil {
 		log.Fatal().Err(err).Msg("invalid time zone")
+	}
+
+	if conf.DDStateFilePath == "" {
+		log.Fatal().Msg("missing path to deduplicator state file (ddStateFilePath)")
+	}
+
+	if err := conf.Redis.ValidateAndDefaults(); err != nil {
+		log.Fatal().Err(err).Msg("invalid Redis configuration")
 	}
 }

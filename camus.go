@@ -22,17 +22,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/czcorpus/cnc-gokit/logging"
-	"github.com/czcorpus/cnc-gokit/uniresp"
-	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
 )
 
@@ -48,59 +46,40 @@ type VersionInfo struct {
 	GitCommit string `json:"gitCommit"`
 }
 
-func runApiServerAndBlock(
-	conf *cnf.Conf,
-	syscallChan chan os.Signal,
-	exitEvent chan os.Signal,
-) {
-	if !conf.LogLevel.IsDebugMode() {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
-	engine := gin.New()
-	engine.Use(gin.Recovery())
-	engine.Use(logging.GinMiddleware())
-	engine.NoMethod(uniresp.NoMethodHandler)
-	engine.NoRoute(uniresp.NotFoundHandler)
-
-	handler := Actions{}
-
-	engine.GET("/overview", handler.Overview)
-
-	log.Info().Msgf("starting to listen at %s:%d", conf.ListenAddress, conf.ListenPort)
-	srv := &http.Server{
-		Handler:      engine,
-		Addr:         fmt.Sprintf("%s:%d", conf.ListenAddress, conf.ListenPort),
-		WriteTimeout: time.Duration(conf.ServerWriteTimeoutSecs) * time.Second,
-		ReadTimeout:  time.Duration(conf.ServerReadTimeoutSecs) * time.Second,
-	}
-	go func() {
-		err := srv.ListenAndServe()
-		if err != nil {
-			log.Error().Err(err).Msg("")
-		}
-		syscallChan <- syscall.SIGTERM
-	}()
-
-	select {
-	case <-exitEvent:
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		err := srv.Shutdown(ctx)
-		if err != nil {
-			log.Info().Err(err).Msg("Shutdown request error")
-		}
-	}
+type service interface {
+	Start(ctx context.Context)
+	Stop(ctx context.Context) error
 }
 
-func runArchiver(conf *cnf.Conf, exitEvent chan os.Signal) {
+func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
 	rds := archiver.NewRedisAdapter(conf.Redis)
-	job := archiver.NewBgJob(
+	db, err := archiver.DBOpen(conf.MySQL)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to open SQL database")
+		os.Exit(1)
+		return nil
+	}
+	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to initialize deduplicator")
+		os.Exit(1)
+		return nil
+	}
+	if loadLastN > 0 {
+		if err := dedup.PreloadLastNItems(loadLastN); err != nil {
+			log.Error().Err(err).Msg("Failed to preload items")
+			os.Exit(1)
+		}
+	}
+	job := archiver.NewArchKeeper(
 		rds,
+		db,
+		dedup,
+		conf.TimezoneLocation(),
 		time.Duration(conf.CheckIntervalSecs)*time.Second,
 		conf.CheckIntervalChunk,
-		exitEvent)
-	job.GoRun()
+	)
+	return job
 }
 
 func cleanVersionInfo(v string) string {
@@ -120,6 +99,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s [options] version\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
+	loadLastN := flag.Int(
+		"load-last-n", 0, "Load last N items from archive database to start with deduplication checking early")
 	flag.Parse()
 	action := flag.Arg(0)
 	if action == "version" {
@@ -145,8 +126,47 @@ func main() {
 
 	switch action {
 	case "start":
-		runArchiver(conf, jobExitEvent)
-		runApiServerAndBlock(conf, syscallChan, exitEvent)
+		arch := runArchiver(conf, *loadLastN)
+		as := &apiServer{
+			arch: arch,
+			conf: conf,
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		services := []service{arch, as}
+		for _, m := range services {
+			m.Start(ctx)
+		}
+		<-ctx.Done()
+		log.Warn().Msg("shutdown signal received")
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		var wg sync.WaitGroup
+		for _, s := range services {
+			wg.Add(1)
+			go func(srv service) {
+				defer wg.Done()
+				if err := srv.Stop(shutdownCtx); err != nil {
+					log.Error().Err(err).Type("service", srv).Msg("Error shutting down service")
+				}
+			}(s)
+		}
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			log.Info().Msg("Graceful shutdown completed")
+		case <-shutdownCtx.Done():
+			log.Warn().Msg("Shutdown timed out")
+		}
+
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)
 	}
