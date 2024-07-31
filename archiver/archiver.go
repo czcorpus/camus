@@ -157,7 +157,7 @@ func (job *ArchKeeper) performCheck() error {
 	var numFetched int
 	for _, item := range items {
 		currStats.NumFetched++
-		rec, err := job.redis.GetConcRecord(item.Key)
+		rec, err := job.redis.GetConcRecord(item.KeyCode())
 		if err != nil {
 			log.Error().
 				Err(err).
