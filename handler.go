@@ -20,10 +20,15 @@ import (
 	"camus/archiver"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	brokenConcRec1 = regexp.MustCompile(`^get concordance:[^:]+:\s*`)
 )
 
 type visitedIds map[string]int
@@ -110,4 +115,26 @@ func (a *Actions) Validate(ctx *gin.Context) {
 			"visitedIds": visitedIDs.IDList(),
 		},
 	)
+}
+
+func (a *Actions) Fix(ctx *gin.Context) {
+	recs, err := a.BgJob.LoadRecordsByID(ctx.Param("id"))
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
+		return
+	}
+	fixedRecs := make([]archiver.ArchRecord, len(recs))
+	for i, rec := range recs {
+		rec.Data = brokenConcRec1.ReplaceAllString(rec.Data, "")
+		fixedRecs[i] = rec
+	}
+	newRec, err := a.BgJob.DeduplicateInArchive(fixedRecs, fixedRecs[0])
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
+		return
+	}
+	ans := make(map[string]any)
+	ans["numInstances"] = len(recs)
+	ans["fixed"] = newRec
+	uniresp.WriteJSONResponse(ctx.Writer, ans)
 }

@@ -203,23 +203,26 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 				Msg("Conc. persistence consistency error")
 		}
 	}
-	if len(queryTest) > 0 {
-		err = dd.removeRecordsByID(newRec.ID)
-		if err != nil {
-			return true, fmt.Errorf("failed to finish deduplication for %s: %w", newRec.ID, err)
-		}
+	_, err = dd.DeduplicateInArchive(queryTest[bestRecKey], newRec)
+	return true, err
+}
+
+func (dd *Deduplicator) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+	err := dd.removeRecordsByID(rec.ID)
+	if err != nil {
+		return ArchRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
 	}
-	ans := dd.mergeRecords(queryTest[bestRecKey], newRec)
+	ans := dd.mergeRecords(curr, rec)
 	err = InsertRecord(dd.concDB, ans)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("concId", newRec.ID).
+			Str("concId", rec.ID).
 			Str("data", ans.Data).
 			Msg("failed to insert merged record")
-		return true, fmt.Errorf("failed to store merged record %s: %w", newRec.ID, err)
+		return ans, fmt.Errorf("failed to store merged record %s: %w", rec.ID, err)
 	}
-	return true, nil
+	return ans, nil
 }
 
 func NewDeduplicator(concDB *sql.DB, loc *time.Location, stateFilePath string) (*Deduplicator, error) {

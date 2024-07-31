@@ -70,20 +70,6 @@ func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	return job.dedup.LoadRecordsByID(concID)
 }
 
-func (job *ArchKeeper) Deduplicate(concID string) Deduplication {
-	var ans Deduplication
-	records, err := job.dedup.LoadRecordsByID(concID)
-	if err != nil {
-		ans.error = fmt.Errorf("failed to deduplicate %s: %w", concID, err)
-		return ans
-	}
-	if len(records) == 0 {
-		return ans
-	}
-	ans.FinalRecord = job.dedup.mergeRecords(records, records[0])
-	return ans
-}
-
 func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) bool {
 
 	match, err := job.dedup.TestAndSolve(rec)
@@ -185,6 +171,10 @@ func (job *ArchKeeper) performCheck() error {
 		Msg("regular archiving report")
 	job.stats.UpdateBy(currStats)
 	return nil
+}
+
+func (job *ArchKeeper) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+	return job.dedup.DeduplicateInArchive(curr, rec)
 }
 
 func NewArchKeeper(
