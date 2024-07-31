@@ -102,7 +102,7 @@ func (rd *RedisAdapter) GetConcRecord(id string) (ArchRecord, error) {
 	}
 	return ArchRecord{
 		ID:   id,
-		Data: ans.String(),
+		Data: ans.Val(),
 	}, nil
 }
 

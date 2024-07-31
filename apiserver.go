@@ -52,6 +52,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.GET("/overview", handler.Overview)
 	engine.GET("/record/:id", handler.GetRecord)
 	engine.GET("/validate/:id", handler.Validate)
+	engine.POST("/fix/:id", handler.Fix)
 
 	api.server = &http.Server{
 		Handler:      engine,
