@@ -17,35 +17,31 @@
 package archiver
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-type BgJob struct {
+type ArchKeeper struct {
 	redis              *RedisAdapter
+	db                 *sql.DB
 	checkInterval      time.Duration
 	checkIntervalChunk int
-	doneChan           <-chan os.Signal
+	dedup              *Deduplicator
+	tz                 *time.Location
+	stats              BgJobStats
 }
 
-func (job *BgJob) performCheck() {
-	log.Warn().Msg("doing regular check")
-	items, err := job.redis.NextNItems(int64(job.checkIntervalChunk))
-	if err != nil {
-		log.Error().Err(err).Msg("failed to process chunk")
-	}
-	fmt.Println("ITEMS: ", items)
-}
-
-func (job *BgJob) GoRun() {
+func (job *ArchKeeper) Start(ctx context.Context) {
 	ticker := time.NewTicker(job.checkInterval)
 	go func() {
 		for {
 			select {
-			case <-job.doneChan:
+			case <-ctx.Done():
+				log.Info().Msg("about to close ArchKeeper")
 				return
 			case <-ticker.C:
 				job.performCheck()
@@ -54,11 +50,157 @@ func (job *BgJob) GoRun() {
 	}()
 }
 
-func NewBgJob(redis *RedisAdapter, checkInterval time.Duration, checkIntervalChunk int, doneChan <-chan os.Signal) *BgJob {
-	return &BgJob{
+func (job *ArchKeeper) Stop(ctx context.Context) error {
+	log.Warn().Msg("stopping ArchKeeper")
+	if err := job.dedup.OnClose(); err != nil {
+		return fmt.Errorf("failed to stop ArchKeeper properly: %w", err)
+	}
+	return nil
+}
+
+func (job *ArchKeeper) StoreToDisk() {
+
+}
+
+func (job *ArchKeeper) GetStats() BgJobStats {
+	return job.stats
+}
+
+func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+	return job.dedup.LoadRecordsByID(concID)
+}
+
+func (job *ArchKeeper) Deduplicate(concID string) Deduplication {
+	var ans Deduplication
+	records, err := job.dedup.LoadRecordsByID(concID)
+	if err != nil {
+		ans.error = fmt.Errorf("failed to deduplicate %s: %w", concID, err)
+		return ans
+	}
+	if len(records) == 0 {
+		return ans
+	}
+	ans.FinalRecord = job.dedup.mergeRecords(records, records[0])
+	return ans
+}
+
+func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) bool {
+
+	match, err := job.dedup.TestAndSolve(rec)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("recordId", item.Key).
+			Msg("failed to insert record, skipping")
+		if err := job.redis.AddError(item, &rec); err != nil {
+			log.Error().Err(err).Msg("failed to insert error key")
+		}
+		currStats.NumErrors++
+		return false
+	}
+	if match {
+		log.Warn().
+			Str("recordId", item.Key).
+			Msg("record already archived, data merged")
+		currStats.NumMerged++
+		return true
+	}
+	if err := InsertRecord(job.db, rec); err != nil {
+		log.Error().
+			Err(err).
+			Str("recordId", item.Key).
+			Msg("failed to insert record, skipping")
+		if err := job.redis.AddError(item, &rec); err != nil {
+			log.Error().Err(err).Msg("failed to insert error key")
+		}
+	}
+	job.dedup.Add(rec.ID)
+	currStats.NumInserted++
+	return false
+}
+
+func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) {
+	exists, err := ContainsRecord(job.db, rec.ID)
+	if err != nil {
+		currStats.NumErrors++
+		log.Error().
+			Err(err).
+			Str("recordId", item.Key).
+			Msg("failed to test record existence, skipping")
+	}
+	if !exists {
+		err := InsertRecord(job.db, rec)
+		if err != nil {
+			currStats.NumErrors++
+			log.Error().
+				Err(err).
+				Str("recordId", item.Key).
+				Msg("failed to insert record, skipping")
+
+		} else {
+			currStats.NumInserted++
+		}
+		job.dedup.Add(rec.ID)
+	}
+}
+
+func (job *ArchKeeper) performCheck() error {
+	items, err := job.redis.NextNItems(int64(job.checkIntervalChunk))
+	log.Debug().
+		AnErr("error", err).
+		Int("itemsToProcess", len(items)).
+		Msg("doing regular check")
+	if err != nil {
+		return fmt.Errorf("failed to fetch next queued chunk: %w", err)
+	}
+	var currStats BgJobStats
+	var numFetched int
+	for _, item := range items {
+		currStats.NumFetched++
+		rec, err := job.redis.GetConcRecord(item.Key)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("recordId", item.Key).
+				Msg("failed to get record from Redis, skipping")
+			if err := job.redis.AddError(item, nil); err != nil {
+				log.Error().Err(err).Msg("failed to insert error key")
+			}
+			currStats.NumErrors++
+			continue
+		}
+		rec.Created = time.Now().In(job.tz)
+		if item.Explicit {
+			job.handleExplicitReq(rec, item, &currStats)
+
+		} else {
+			job.handleImplicitReq(rec, item, &currStats)
+		}
+	}
+	log.Info().
+		Int("numInserted", currStats.NumInserted).
+		Int("numMerged", currStats.NumMerged).
+		Int("numErrors", currStats.NumErrors).
+		Int("numFetched", numFetched).
+		Msg("regular archiving report")
+	job.stats.UpdateBy(currStats)
+	return nil
+}
+
+func NewArchKeeper(
+	redis *RedisAdapter,
+	db *sql.DB,
+	dedup *Deduplicator,
+	tz *time.Location,
+	checkInterval time.Duration,
+	checkIntervalChunk int,
+) *ArchKeeper {
+	return &ArchKeeper{
 		redis:              redis,
+		db:                 db,
+		dedup:              dedup,
+		tz:                 tz,
 		checkInterval:      checkInterval,
 		checkIntervalChunk: checkIntervalChunk,
-		doneChan:           doneChan,
 	}
 }
