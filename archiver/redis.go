@@ -30,6 +30,13 @@ type queueRecord struct {
 	Explicit bool   `json:"explicit"`
 }
 
+func (qr queueRecord) KeyCode() string {
+	if strings.HasPrefix(qr.Key, "concordance:") {
+		return strings.Split(qr.Key, "concordance:")[1]
+	}
+	return qr.Key
+}
+
 type RedisAdapter struct {
 	conf  *RedisConf
 	redis *redis.Client
@@ -77,6 +84,9 @@ func (rd *RedisAdapter) AddError(item queueRecord, rec *ArchRecord) error {
 	if rec != nil {
 		cmd = rd.redis.HSet(
 			rd.ctx, rd.conf.FailedRecordsKey, item.Key, rec.Data)
+		if cmd.Err() != nil {
+			return fmt.Errorf("failed to insert error record %s: %w", item.Key, cmd.Err())
+		}
 	}
 	return nil
 }
