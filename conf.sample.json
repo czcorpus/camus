@@ -7,13 +7,23 @@
     "timeZone": "Europe/Prague",
     "logLevel": "debug",
     "redis": {
-        "host": "databases",
+        "host": "dbhost",
         "port": 6379,
-        "db": 2,
-        "queueKey": "testing_queue",
+        "db": 1,
+        "queueKey": "conc_archive_queue",
         "failedRecordsKey": "camus_failed_items"
     },
-    "checkIntervalSecs": 10,
+    "db": {
+        "host": "sqlhost",
+        "name": "dbname",
+        "user": "dbuser",
+        "password": "***"
+    },
+    "cleaner": {
+        "checkIntervalSecs": 60,
+        "numProcessItemsPerTick": 5
+    },
+    "checkIntervalSecs": 5,
     "checkIntervalChunk": 2,
     "ddStateFilePath": "./deduplicator.bin"
 }

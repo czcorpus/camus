@@ -18,8 +18,10 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cleaner"
 	"camus/cnf"
 	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -51,14 +53,9 @@ type service interface {
 	Stop(ctx context.Context) error
 }
 
-func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
+func createArchiver(conf *cnf.Conf, db *sql.DB, loadLastN int) *archiver.ArchKeeper {
 	rds := archiver.NewRedisAdapter(conf.Redis)
-	db, err := archiver.DBOpen(conf.MySQL)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to open SQL database")
-		os.Exit(1)
-		return nil
-	}
+
 	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to initialize deduplicator")
@@ -71,7 +68,7 @@ func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
 			os.Exit(1)
 		}
 	}
-	job := archiver.NewArchKeeper(
+	return archiver.NewArchKeeper(
 		rds,
 		db,
 		dedup,
@@ -79,7 +76,6 @@ func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
 		time.Duration(conf.CheckIntervalSecs)*time.Second,
 		conf.CheckIntervalChunk,
 	)
-	return job
 }
 
 func cleanVersionInfo(v string) string {
@@ -126,14 +122,21 @@ func main() {
 
 	switch action {
 	case "start":
-		arch := runArchiver(conf, *loadLastN)
+		db, err := archiver.DBOpen(conf.MySQL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to open SQL database")
+			os.Exit(1)
+			return
+		}
+		arch := createArchiver(conf, db, *loadLastN)
 		as := &apiServer{
 			arch: arch,
 			conf: conf,
 		}
+		cln := cleaner.NewService(db, conf.Cleaner)
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		services := []service{arch, as}
+		services := []service{arch, cln, as}
 		for _, m := range services {
 			m.Start(ctx)
 		}
