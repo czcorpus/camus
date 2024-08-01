@@ -54,6 +54,19 @@ func DBOpen(conf *DBConf) (*sql.DB, error) {
 	return db, nil
 }
 
+func generateRows(sqlRows *sql.Rows, expectedSize int) ([]ArchRecord, error) {
+	ans := make([]ArchRecord, 0, expectedSize)
+	for sqlRows.Next() {
+		var item ArchRecord
+		err := sqlRows.Scan(&item.ID, &item.Data, &item.Created, &item.NumAccess, &item.LastAccess, &item.Permanent)
+		if err != nil {
+			return []ArchRecord{}, fmt.Errorf("failed to load recent records: %w", err)
+		}
+		ans = append(ans, item)
+	}
+	return ans, nil
+}
+
 func LoadRecentNRecords(db *sql.DB, num int) ([]ArchRecord, error) {
 	if num > maxRecentRecords {
 		panic(fmt.Sprintf("cannot load more than %d records at a time", maxRecentRecords))
@@ -63,16 +76,19 @@ func LoadRecentNRecords(db *sql.DB, num int) ([]ArchRecord, error) {
 	if err != nil {
 		return []ArchRecord{}, fmt.Errorf("failed to load recent records: %w", err)
 	}
-	ans := make([]ArchRecord, 0, num)
-	for rows.Next() {
-		var item ArchRecord
-		err := rows.Scan(&item.ID, &item.Data, &item.Created, &item.NumAccess, &item.LastAccess, &item.Permanent)
-		if err != nil {
-			return []ArchRecord{}, fmt.Errorf("failed to load recent records: %w", err)
-		}
-		ans = append(ans, item)
+	return generateRows(rows, num)
+}
+
+func LoadRecordsFromDate(db *sql.DB, fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+	rows, err := db.Query(
+		"SELECT id, data, created, num_access, last_access, permanent "+
+			"FROM kontext_conc_persistence "+
+			"WHERE created >= ? "+
+			"ORDER BY created LIMIT ?", fromDate, maxItems)
+	if err != nil {
+		return []ArchRecord{}, fmt.Errorf("failed to load records: %w", err)
 	}
-	return ans, nil
+	return generateRows(rows, maxItems)
 }
 
 func ContainsRecord(db *sql.DB, concID string) (bool, error) {
@@ -86,6 +102,27 @@ func ContainsRecord(db *sql.DB, concID string) (bool, error) {
 	return ans, nil
 }
 
+func LoadRecordsByID(db *sql.DB, concID string) ([]ArchRecord, error) {
+	rows, err := db.Query(
+		"SELECT data, created, num_access, last_access, permanent "+
+			"FROM kontext_conc_persistence WHERE id = ?", concID)
+	if err != nil {
+		return []ArchRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
+	}
+	ans := make([]ArchRecord, 0, 10)
+	for rows.Next() {
+		item := ArchRecord{ID: concID}
+		err := rows.Scan(
+			&item.Data, &item.Created, &item.NumAccess, &item.LastAccess,
+			&item.Permanent)
+		if err != nil {
+			return []ArchRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
+		}
+		ans = append(ans, item)
+	}
+	return ans, nil
+}
+
 func InsertRecord(db *sql.DB, rec ArchRecord) error {
 	_, err := db.Exec(
 		"INSERT INTO kontext_conc_persistence (id, data, created, num_access, last_access, permanent) "+
@@ -94,6 +131,31 @@ func InsertRecord(db *sql.DB, rec ArchRecord) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert archive record: %w", err)
+	}
+	return nil
+}
+
+func UpdateRecordStatus(db *sql.DB, id string, status int) error {
+	res, err := db.Exec(
+		"UPDATE kontext_conc_persistence SET permanent = ? WHERE id = ?", status, id)
+	if err != nil {
+		return fmt.Errorf("failed to update status of %s: %w", id, err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update status of %s: %w", id, err)
+	}
+	if aff == 0 {
+		return fmt.Errorf("cannot update record status, id %s not in archive", id)
+	}
+	return nil
+}
+
+func RemoveRecordsByID(db *sql.DB, concID string) error {
+	_, err := db.Exec(
+		"DELETE FROM kontext_conc_persistence WHERE id = ?", concID)
+	if err != nil {
+		return fmt.Errorf("failed to remove records with id %s: %w", concID, err)
 	}
 	return nil
 }

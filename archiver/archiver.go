@@ -67,7 +67,7 @@ func (job *ArchKeeper) GetStats() BgJobStats {
 }
 
 func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
-	return job.dedup.LoadRecordsByID(concID)
+	return LoadRecordsByID(job.db, concID)
 }
 
 func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) bool {
@@ -174,7 +174,7 @@ func (job *ArchKeeper) performCheck() error {
 }
 
 func (job *ArchKeeper) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
-	return job.dedup.DeduplicateInArchive(curr, rec)
+	return DeduplicateInArchive(job.db, curr, rec, job.tz)
 }
 
 func NewArchKeeper(

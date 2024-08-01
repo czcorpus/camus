@@ -19,6 +19,13 @@ package cleaner
 import (
 	"fmt"
 	"time"
+
+	"github.com/rs/zerolog/log"
+)
+
+const (
+	dfltStatusKey           = "camus_cleanup_status"
+	minAllowedCheckInterval = 10
 )
 
 type Conf struct {
@@ -32,11 +39,18 @@ func (conf Conf) CheckInterval() time.Duration {
 }
 
 func (conf *Conf) ValidateAndDefaults() error {
-	if conf.CheckIntervalSecs < 60 {
-		return fmt.Errorf("invalid value for checkIntervalSecs (must be >= 60)")
+	if conf.CheckIntervalSecs < minAllowedCheckInterval {
+		return fmt.Errorf(
+			"invalid value %d for checkIntervalSecs (must be >= %d)",
+			conf.CheckIntervalSecs, minAllowedCheckInterval,
+		)
 	}
 	if conf.NumProcessItemsPerTick < 1 || conf.NumProcessItemsPerTick > 5000 {
 		return fmt.Errorf("invalid value for numProcessItemsPerTick (must be between 1 and 5000)")
+	}
+	if conf.StatusKey == "" {
+		log.Warn().Str("value", dfltStatusKey).Msg("cleanup configuration `statusKey` missing, using default")
+		conf.StatusKey = dfltStatusKey
 	}
 	return nil
 }

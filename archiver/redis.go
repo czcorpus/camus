@@ -43,6 +43,25 @@ type RedisAdapter struct {
 	ctx   context.Context
 }
 
+func (rd *RedisAdapter) Get(k string) (string, error) {
+	cmd := rd.redis.Get(rd.ctx, k)
+	if cmd.Err() == redis.Nil {
+		return "", nil
+	}
+	if cmd.Err() != nil {
+		return "", fmt.Errorf("failed to get Redis entry %s: %w", k, cmd.Err())
+	}
+	return cmd.Val(), nil
+}
+
+func (rd *RedisAdapter) Set(k string, v any) error {
+	cmd := rd.redis.Set(rd.ctx, k, v, 0)
+	if cmd.Err() != nil {
+		return fmt.Errorf("failed to set Redis item %s: %w", k, cmd.Err())
+	}
+	return nil
+}
+
 func (rd *RedisAdapter) NextNItems(n int64) ([]queueRecord, error) {
 	ans := make([]queueRecord, 0, n)
 	ppl := rd.redis.Pipeline()

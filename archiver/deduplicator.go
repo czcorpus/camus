@@ -96,60 +96,8 @@ func (dd *Deduplicator) PreloadLastNItems(num int) error {
 	return nil
 }
 
-func (dd *Deduplicator) LoadRecordsByID(concID string) ([]ArchRecord, error) {
-	rows, err := dd.concDB.Query(
-		"SELECT data, created, num_access, last_access, permanent "+
-			"FROM kontext_conc_persistence WHERE id = ?", concID)
-	if err != nil {
-		return []ArchRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
-	}
-	ans := make([]ArchRecord, 0, 10)
-	for rows.Next() {
-		item := ArchRecord{ID: concID}
-		err := rows.Scan(
-			&item.Data, &item.Created, &item.NumAccess, &item.LastAccess,
-			&item.Permanent)
-		if err != nil {
-			return []ArchRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
-		}
-		ans = append(ans, item)
-	}
-	return ans, nil
-}
-
 func (dd *Deduplicator) TestRecord(concID string) bool {
 	return dd.items.TestString(concID)
-}
-
-func (dd *Deduplicator) removeRecordsByID(concID string) error {
-	_, err := dd.concDB.Exec(
-		"DELETE FROM kontext_conc_persistence WHERE id = ?", concID)
-	if err != nil {
-		return fmt.Errorf("failed to remove records with id %s: %w", concID, err)
-	}
-	return nil
-}
-
-func (dd *Deduplicator) mergeRecords(recs []ArchRecord, newRec ArchRecord) ArchRecord {
-	if len(recs) == 0 {
-		panic("cannot merge empty slice of ArchRecords")
-	}
-	ans := newRec
-	ans.NumAccess++
-	ans.LastAccess = time.Now().In(dd.tz)
-	for _, rec := range recs {
-		ans.NumAccess += rec.NumAccess
-		if rec.Created.Before(ans.Created) && !rec.Created.IsZero() {
-			ans.Created = rec.Created
-		}
-		if rec.LastAccess.After(ans.LastAccess) {
-			ans.LastAccess = rec.LastAccess
-		}
-		if rec.Permanent > ans.Permanent {
-			ans.Permanent = rec.Permanent
-		}
-	}
-	return ans
 }
 
 // TestAndSolve looks for whether the record has been recently used and if so
@@ -162,7 +110,7 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 	if !dd.items.TestString(newRec.ID) {
 		return false, nil
 	}
-	recs, err := dd.LoadRecordsByID(newRec.ID)
+	recs, err := LoadRecordsByID(dd.concDB, newRec.ID)
 	if err != nil {
 		return false, fmt.Errorf("failed to deduplicate id %s: %w", newRec.ID, err)
 	}
@@ -203,26 +151,8 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 				Msg("Conc. persistence consistency error")
 		}
 	}
-	_, err = dd.DeduplicateInArchive(queryTest[bestRecKey], newRec)
+	_, err = DeduplicateInArchive(dd.concDB, queryTest[bestRecKey], newRec, dd.tz)
 	return true, err
-}
-
-func (dd *Deduplicator) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
-	err := dd.removeRecordsByID(rec.ID)
-	if err != nil {
-		return ArchRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
-	}
-	ans := dd.mergeRecords(curr, rec)
-	err = InsertRecord(dd.concDB, ans)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("concId", rec.ID).
-			Str("data", ans.Data).
-			Msg("failed to insert merged record")
-		return ans, fmt.Errorf("failed to store merged record %s: %w", rec.ID, err)
-	}
-	return ans, nil
 }
 
 func NewDeduplicator(concDB *sql.DB, loc *time.Location, stateFilePath string) (*Deduplicator, error) {
