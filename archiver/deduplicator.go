@@ -17,7 +17,6 @@
 package archiver
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"time"
@@ -34,7 +33,7 @@ const (
 
 type Deduplicator struct {
 	items           *bloom.BloomFilter
-	concDB          *sql.DB
+	concDB          IMySQLOps
 	tz              *time.Location
 	preloadLastN    int
 	storageFilePath string
@@ -85,7 +84,7 @@ func (dd *Deduplicator) Reset() error {
 
 func (dd *Deduplicator) PreloadLastNItems(num int) error {
 	dd.preloadLastN = num
-	items, err := LoadRecentNRecords(dd.concDB, num)
+	items, err := dd.concDB.LoadRecentNRecords(num)
 	if err != nil {
 		return fmt.Errorf("failed to preload last N items: %w", err)
 	}
@@ -110,7 +109,7 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 	if !dd.items.TestString(newRec.ID) {
 		return false, nil
 	}
-	recs, err := LoadRecordsByID(dd.concDB, newRec.ID)
+	recs, err := dd.concDB.LoadRecordsByID(newRec.ID)
 	if err != nil {
 		return false, fmt.Errorf("failed to deduplicate id %s: %w", newRec.ID, err)
 	}
@@ -151,11 +150,11 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 				Msg("Conc. persistence consistency error")
 		}
 	}
-	_, err = DeduplicateInArchive(dd.concDB, queryTest[bestRecKey], newRec, dd.tz)
+	_, err = dd.concDB.DeduplicateInArchive(queryTest[bestRecKey], newRec)
 	return true, err
 }
 
-func NewDeduplicator(concDB *sql.DB, loc *time.Location, stateFilePath string) (*Deduplicator, error) {
+func NewDeduplicator(concDB IMySQLOps, loc *time.Location, stateFilePath string) (*Deduplicator, error) {
 	filter := bloom.NewWithEstimates(bloomFilterNumBits, bloomFilterProbCollision)
 	d := &Deduplicator{
 		tz:              loc,

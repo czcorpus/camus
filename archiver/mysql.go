@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -67,11 +68,16 @@ func generateRows(sqlRows *sql.Rows, expectedSize int) ([]ArchRecord, error) {
 	return ans, nil
 }
 
-func LoadRecentNRecords(db *sql.DB, num int) ([]ArchRecord, error) {
+type MySQLOps struct {
+	db *sql.DB
+	tz *time.Location
+}
+
+func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	if num > maxRecentRecords {
 		panic(fmt.Sprintf("cannot load more than %d records at a time", maxRecentRecords))
 	}
-	rows, err := db.Query("SELECT id, data, created, num_access, last_access, permanent "+
+	rows, err := ops.db.Query("SELECT id, data, created, num_access, last_access, permanent "+
 		"FROM kontext_conc_persistence ORDER BY created DESC LIMIT ?", num)
 	if err != nil {
 		return []ArchRecord{}, fmt.Errorf("failed to load recent records: %w", err)
@@ -79,8 +85,8 @@ func LoadRecentNRecords(db *sql.DB, num int) ([]ArchRecord, error) {
 	return generateRows(rows, num)
 }
 
-func LoadRecordsFromDate(db *sql.DB, fromDate time.Time, maxItems int) ([]ArchRecord, error) {
-	rows, err := db.Query(
+func (ops *MySQLOps) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+	rows, err := ops.db.Query(
 		"SELECT id, data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence "+
 			"WHERE created >= ? "+
@@ -91,8 +97,8 @@ func LoadRecordsFromDate(db *sql.DB, fromDate time.Time, maxItems int) ([]ArchRe
 	return generateRows(rows, maxItems)
 }
 
-func ContainsRecord(db *sql.DB, concID string) (bool, error) {
-	row := db.QueryRow("SELECT COUNT(*) FROM kontext_conc_persistence "+
+func (ops *MySQLOps) ContainsRecord(concID string) (bool, error) {
+	row := ops.db.QueryRow("SELECT COUNT(*) FROM kontext_conc_persistence "+
 		"WHERE id = ? LIMIT 1", concID)
 	if row.Err() != nil {
 		return false, fmt.Errorf("failed to test existence of record %s: %w", concID, row.Err())
@@ -102,8 +108,8 @@ func ContainsRecord(db *sql.DB, concID string) (bool, error) {
 	return ans, nil
 }
 
-func LoadRecordsByID(db *sql.DB, concID string) ([]ArchRecord, error) {
-	rows, err := db.Query(
+func (ops *MySQLOps) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+	rows, err := ops.db.Query(
 		"SELECT data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence WHERE id = ?", concID)
 	if err != nil {
@@ -123,8 +129,8 @@ func LoadRecordsByID(db *sql.DB, concID string) ([]ArchRecord, error) {
 	return ans, nil
 }
 
-func InsertRecord(db *sql.DB, rec ArchRecord) error {
-	_, err := db.Exec(
+func (ops *MySQLOps) InsertRecord(rec ArchRecord) error {
+	_, err := ops.db.Exec(
 		"INSERT INTO kontext_conc_persistence (id, data, created, num_access, last_access, permanent) "+
 			"VALUES (?, ?, ?, ?, ?, ?)",
 		rec.ID, rec.Data, rec.Created, rec.NumAccess, rec.LastAccess, rec.Permanent,
@@ -135,8 +141,8 @@ func InsertRecord(db *sql.DB, rec ArchRecord) error {
 	return nil
 }
 
-func UpdateRecordStatus(db *sql.DB, id string, status int) error {
-	res, err := db.Exec(
+func (ops *MySQLOps) UpdateRecordStatus(id string, status int) error {
+	res, err := ops.db.Exec(
 		"UPDATE kontext_conc_persistence SET permanent = ? WHERE id = ?", status, id)
 	if err != nil {
 		return fmt.Errorf("failed to update status of %s: %w", id, err)
@@ -151,11 +157,36 @@ func UpdateRecordStatus(db *sql.DB, id string, status int) error {
 	return nil
 }
 
-func RemoveRecordsByID(db *sql.DB, concID string) error {
-	_, err := db.Exec(
+func (ops *MySQLOps) RemoveRecordsByID(concID string) error {
+	_, err := ops.db.Exec(
 		"DELETE FROM kontext_conc_persistence WHERE id = ?", concID)
 	if err != nil {
 		return fmt.Errorf("failed to remove records with id %s: %w", concID, err)
 	}
 	return nil
+}
+
+func (ops *MySQLOps) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+	err := ops.RemoveRecordsByID(rec.ID)
+	if err != nil {
+		return ArchRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
+	}
+	ans := MergeRecords(curr, rec, ops.tz)
+	err = ops.InsertRecord(ans)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("concId", rec.ID).
+			Str("data", ans.Data).
+			Msg("failed to insert merged record")
+		return ans, fmt.Errorf("failed to store merged record %s: %w", rec.ID, err)
+	}
+	return ans, nil
+}
+
+func NewMySQLOps(db *sql.DB, tz *time.Location) *MySQLOps {
+	return &MySQLOps{
+		db: db,
+		tz: tz,
+	}
 }

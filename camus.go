@@ -21,7 +21,6 @@ import (
 	"camus/cleaner"
 	"camus/cnf"
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -53,7 +52,7 @@ type service interface {
 	Stop(ctx context.Context) error
 }
 
-func createArchiver(db *sql.DB, rdb *archiver.RedisAdapter, conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
+func createArchiver(db archiver.IMySQLOps, rdb *archiver.RedisAdapter, conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
 	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to initialize deduplicator")
@@ -95,6 +94,8 @@ func main() {
 	}
 	loadLastN := flag.Int(
 		"load-last-n", 0, "Load last N items from archive database to start with deduplication checking early")
+	dryRun := flag.Bool(
+		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
 	flag.Parse()
 	action := flag.Arg(0)
 	if action == "version" {
@@ -127,12 +128,24 @@ func main() {
 			return
 		}
 		rdb := archiver.NewRedisAdapter(conf.Redis)
-		arch := createArchiver(db, rdb, conf, *loadLastN)
+
+		var dbOps archiver.IMySQLOps
+		dbOpsRaw := archiver.NewMySQLOps(db, conf.TimezoneLocation())
+		if *dryRun {
+			dbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+
+		} else {
+			dbOps = dbOpsRaw
+		}
+
+		arch := createArchiver(dbOps, rdb, conf, *loadLastN)
+
 		as := &apiServer{
 			arch: arch,
 			conf: conf,
 		}
-		cln := cleaner.NewService(db, rdb, conf.Cleaner, conf.TimezoneLocation())
+
+		cln := cleaner.NewService(dbOps, rdb, conf.Cleaner, conf.TimezoneLocation())
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 		services := []service{arch, cln, as}

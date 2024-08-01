@@ -17,13 +17,11 @@
 package archiver
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog/log"
 )
 
 func MergeRecords(recs []ArchRecord, newRec ArchRecord, tz *time.Location) ArchRecord {
@@ -46,24 +44,6 @@ func MergeRecords(recs []ArchRecord, newRec ArchRecord, tz *time.Location) ArchR
 		}
 	}
 	return ans
-}
-
-func DeduplicateInArchive(db *sql.DB, curr []ArchRecord, rec ArchRecord, tz *time.Location) (ArchRecord, error) {
-	err := RemoveRecordsByID(db, rec.ID)
-	if err != nil {
-		return ArchRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
-	}
-	ans := MergeRecords(curr, rec, tz)
-	err = InsertRecord(db, ans)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("concId", rec.ID).
-			Str("data", ans.Data).
-			Msg("failed to insert merged record")
-		return ans, fmt.Errorf("failed to store merged record %s: %w", rec.ID, err)
-	}
-	return ans, nil
 }
 
 func ValidateQueryInstances(variants []ArchRecord) error {

@@ -24,18 +24,24 @@ import (
 )
 
 const (
-	dfltStatusKey           = "camus_cleanup_status"
-	minAllowedCheckInterval = 10
+	dfltStatusKey            = "camus_cleanup_status"
+	minAllowedCheckInterval  = 10
+	minAgeDaysUnvisitedLimit = 30 //365
 )
 
 type Conf struct {
 	CheckIntervalSecs      int    `json:"checkIntervalSecs"`
 	NumProcessItemsPerTick int    `json:"numProcessItemsPerTick"`
 	StatusKey              string `json:"statusKey"`
+	MinAgeDaysUnvisited    int    `json:"minAgeDaysUnvisited"`
 }
 
 func (conf Conf) CheckInterval() time.Duration {
 	return time.Duration(conf.CheckIntervalSecs) * time.Second
+}
+
+func (conf Conf) MinAgeUnvisited() time.Duration {
+	return time.Duration(conf.MinAgeDaysUnvisited) * time.Hour * 24
 }
 
 func (conf *Conf) ValidateAndDefaults() error {
@@ -51,6 +57,9 @@ func (conf *Conf) ValidateAndDefaults() error {
 	if conf.StatusKey == "" {
 		log.Warn().Str("value", dfltStatusKey).Msg("cleanup configuration `statusKey` missing, using default")
 		conf.StatusKey = dfltStatusKey
+	}
+	if conf.MinAgeDaysUnvisited < minAgeDaysUnvisitedLimit {
+		return fmt.Errorf("cleanup configuration `minAgeDaysUnvisited` invalid (must be >= %d)", minAgeDaysUnvisitedLimit)
 	}
 	return nil
 }

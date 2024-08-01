@@ -18,7 +18,6 @@ package archiver
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -27,7 +26,7 @@ import (
 
 type ArchKeeper struct {
 	redis              *RedisAdapter
-	db                 *sql.DB
+	db                 IMySQLOps
 	checkInterval      time.Duration
 	checkIntervalChunk int
 	dedup              *Deduplicator
@@ -67,7 +66,7 @@ func (job *ArchKeeper) GetStats() BgJobStats {
 }
 
 func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
-	return LoadRecordsByID(job.db, concID)
+	return job.db.LoadRecordsByID(concID)
 }
 
 func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) bool {
@@ -91,7 +90,7 @@ func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currS
 		currStats.NumMerged++
 		return true
 	}
-	if err := InsertRecord(job.db, rec); err != nil {
+	if err := job.db.InsertRecord(rec); err != nil {
 		log.Error().
 			Err(err).
 			Str("recordId", item.Key).
@@ -106,7 +105,7 @@ func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currS
 }
 
 func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) {
-	exists, err := ContainsRecord(job.db, rec.ID)
+	exists, err := job.db.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
 		log.Error().
@@ -115,7 +114,7 @@ func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currS
 			Msg("failed to test record existence, skipping")
 	}
 	if !exists {
-		err := InsertRecord(job.db, rec)
+		err := job.db.InsertRecord(rec)
 		if err != nil {
 			currStats.NumErrors++
 			log.Error().
@@ -174,12 +173,12 @@ func (job *ArchKeeper) performCheck() error {
 }
 
 func (job *ArchKeeper) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
-	return DeduplicateInArchive(job.db, curr, rec, job.tz)
+	return job.db.DeduplicateInArchive(curr, rec)
 }
 
 func NewArchKeeper(
 	redis *RedisAdapter,
-	db *sql.DB,
+	db IMySQLOps,
 	dedup *Deduplicator,
 	tz *time.Location,
 	checkInterval time.Duration,

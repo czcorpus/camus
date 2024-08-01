@@ -19,7 +19,6 @@ package cleaner
 import (
 	"camus/archiver"
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -39,7 +38,7 @@ type CleanupStats struct {
 
 type Service struct {
 	conf           Conf
-	db             *sql.DB
+	db             archiver.IMySQLOps
 	rdb            *archiver.RedisAdapter
 	tz             *time.Location
 	dryRun         bool
@@ -78,6 +77,8 @@ func (job *Service) performCleanup() error {
 	job.cleanupRunning = true
 	defer func() { job.cleanupRunning = false }()
 	t0 := time.Now()
+
+	birthLimit := time.Now().In(job.tz).Add(-job.conf.MinAgeUnvisited())
 	var stats CleanupStats
 	lastDateRaw, err := job.rdb.Get(job.conf.StatusKey)
 	if err != nil {
@@ -94,7 +95,7 @@ func (job *Service) performCleanup() error {
 		Time("lastCheck", lastDate).
 		Int("itemsToLoad", job.conf.NumProcessItemsPerTick).
 		Msg("performing archive cleanup")
-	items, err := archiver.LoadRecordsFromDate(job.db, lastDate, job.conf.NumProcessItemsPerTick)
+	items, err := job.db.LoadRecordsFromDate(lastDate, job.conf.NumProcessItemsPerTick)
 	if err != nil {
 		return fmt.Errorf("failed to load requested items for cleanup from database: %w", err)
 	}
@@ -102,13 +103,13 @@ func (job *Service) performCleanup() error {
 	for _, item := range items {
 		visitedIDs.Add(item.ID)
 		stats.NumFetched++
-		variants, err := archiver.LoadRecordsByID(job.db, item.ID)
+		variants, err := job.db.LoadRecordsByID(item.ID)
 		if err != nil {
 			log.Warn().
 				Err(err).
 				Str("recordId", variants[0].ID).
 				Msg("failed to load variants for, setting err flag and skipping")
-			if err := archiver.UpdateRecordStatus(job.db, variants[0].ID, -1); err != nil {
+			if err := job.db.UpdateRecordStatus(variants[0].ID, -1); err != nil {
 				log.Error().
 					Err(err).
 					Str("recordId", variants[0].ID).
@@ -124,7 +125,7 @@ func (job *Service) performCleanup() error {
 				Err(err).
 				Str("recordId", variants[0].ID).
 				Msg("archive record variants failed to validate, setting err flag and skipping")
-			if err := archiver.UpdateRecordStatus(job.db, variants[0].ID, -1); err != nil {
+			if err := job.db.UpdateRecordStatus(variants[0].ID, -1); err != nil {
 				log.Error().
 					Err(err).
 					Str("recordId", variants[0].ID).
@@ -135,13 +136,13 @@ func (job *Service) performCleanup() error {
 		}
 
 		if len(variants) > 1 {
-			_, err := archiver.DeduplicateInArchive(job.db, variants, variants[0], job.tz)
+			mergedItem, err := job.db.DeduplicateInArchive(variants, variants[0])
 			if err != nil {
 				log.Warn().
 					Err(err).
 					Str("recordId", variants[0].ID).
 					Msg("failed to deduplicate items in database, setting err flag and skipping")
-				if err := archiver.UpdateRecordStatus(job.db, variants[0].ID, -1); err != nil {
+				if err := job.db.UpdateRecordStatus(variants[0].ID, -1); err != nil {
 					log.Error().
 						Err(err).
 						Str("recordId", variants[0].ID).
@@ -151,17 +152,51 @@ func (job *Service) performCleanup() error {
 				continue
 			}
 			stats.NumMerged++
+			if mergedItem.NumAccess == 0 && mergedItem.Created.Before(birthLimit) {
+				log.Debug().
+					Str("recordId", mergedItem.ID).
+					Time("limitBirth", birthLimit).
+					Msg("record will be removed due to no access and high age")
+				if err := job.db.RemoveRecordsByID(variants[0].ID); err != nil {
+					if err := job.db.UpdateRecordStatus(variants[0].ID, -1); err != nil {
+						log.Error().
+							Err(err).
+							Str("recordId", variants[0].ID).
+							Msg("failed to set error status")
+					}
+					stats.NumErrors++
+					continue
+				}
+			}
+
+		} else {
+			if variants[0].NumAccess == 0 && variants[0].Created.Before(birthLimit) {
+				log.Debug().
+					Str("recordId", variants[0].ID).
+					Time("limitBirth", birthLimit).
+					Msg("record will be removed due to no access and high age")
+				if err := job.db.RemoveRecordsByID(variants[0].ID); err != nil {
+					if err := job.db.UpdateRecordStatus(variants[0].ID, -1); err != nil {
+						log.Error().
+							Err(err).
+							Str("recordId", variants[0].ID).
+							Msg("failed to set error status")
+					}
+					stats.NumErrors++
+					continue
+				}
+			}
 		}
 	}
 	job.rdb.Set(job.conf.StatusKey, items[len(items)-1].Created.Format(dtFormat))
 	log.Info().
 		Any("stats", stats).
-		Dur("procTime", time.Since(t0)).
+		Float64("procTime", time.Since(t0).Seconds()).
 		Msg("cleanup done")
 	return nil
 }
 
-func NewService(db *sql.DB, rdb *archiver.RedisAdapter, conf Conf, tz *time.Location) *Service {
+func NewService(db archiver.IMySQLOps, rdb *archiver.RedisAdapter, conf Conf, tz *time.Location) *Service {
 	return &Service{
 		conf: conf,
 		db:   db,
