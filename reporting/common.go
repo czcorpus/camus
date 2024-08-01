@@ -20,14 +20,14 @@ import (
 	"context"
 )
 
-type BgJobStats struct {
+type OpStats struct {
 	NumErrors   int `json:"numErrors"`
 	NumMerged   int `json:"numMerged"`
 	NumInserted int `json:"numInserted"`
 	NumFetched  int `json:"numFetched"`
 }
 
-func (bgs *BgJobStats) UpdateBy(other BgJobStats) {
+func (bgs *OpStats) UpdateBy(other OpStats) {
 	bgs.NumErrors += other.NumErrors
 	bgs.NumMerged += other.NumMerged
 	bgs.NumInserted += other.NumInserted
@@ -47,6 +47,6 @@ type CleanupStats struct {
 type IReporting interface {
 	Start(ctx context.Context)
 	Stop(ctx context.Context) error
-	WriteOperationsStatus(item BgJobStats)
+	WriteOperationsStatus(item OpStats)
 	WriteCleanupStatus(item CleanupStats)
 }

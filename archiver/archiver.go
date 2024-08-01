@@ -17,6 +17,7 @@
 package archiver
 
 import (
+	"camus/reporting"
 	"context"
 	"fmt"
 	"time"
@@ -27,11 +28,12 @@ import (
 type ArchKeeper struct {
 	redis              *RedisAdapter
 	db                 IMySQLOps
+	reporting          reporting.IReporting
 	checkInterval      time.Duration
 	checkIntervalChunk int
 	dedup              *Deduplicator
 	tz                 *time.Location
-	stats              BgJobStats
+	stats              reporting.OpStats
 }
 
 func (job *ArchKeeper) Start(ctx context.Context) {
@@ -61,7 +63,7 @@ func (job *ArchKeeper) StoreToDisk() {
 
 }
 
-func (job *ArchKeeper) GetStats() BgJobStats {
+func (job *ArchKeeper) GetStats() reporting.OpStats {
 	return job.stats
 }
 
@@ -69,7 +71,7 @@ func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	return job.db.LoadRecordsByID(concID)
 }
 
-func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) bool {
+func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
 
 	match, err := job.dedup.TestAndSolve(rec)
 	if err != nil {
@@ -104,7 +106,7 @@ func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currS
 	return false
 }
 
-func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currStats *BgJobStats) {
+func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currStats *reporting.OpStats) {
 	exists, err := job.db.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
@@ -138,7 +140,7 @@ func (job *ArchKeeper) performCheck() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch next queued chunk: %w", err)
 	}
-	var currStats BgJobStats
+	var currStats reporting.OpStats
 	var numFetched int
 	for _, item := range items {
 		currStats.NumFetched++
@@ -180,6 +182,7 @@ func NewArchKeeper(
 	redis *RedisAdapter,
 	db IMySQLOps,
 	dedup *Deduplicator,
+	reporting reporting.IReporting,
 	tz *time.Location,
 	checkInterval time.Duration,
 	checkIntervalChunk int,
@@ -188,6 +191,7 @@ func NewArchKeeper(
 		redis:              redis,
 		db:                 db,
 		dedup:              dedup,
+		reporting:          reporting,
 		tz:                 tz,
 		checkInterval:      checkInterval,
 		checkIntervalChunk: checkIntervalChunk,

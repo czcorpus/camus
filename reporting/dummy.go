@@ -39,7 +39,7 @@ func (job *DummyWriter) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (job *DummyWriter) WriteOperationsStatus(item BgJobStats) {
+func (job *DummyWriter) WriteOperationsStatus(item OpStats) {
 	log.Info().Any("stats", item).Msg("writing dummy operations report")
 }
 

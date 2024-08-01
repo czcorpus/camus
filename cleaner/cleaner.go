@@ -18,6 +18,7 @@ package cleaner
 
 import (
 	"camus/archiver"
+	"camus/reporting"
 	"context"
 	"fmt"
 	"time"
@@ -35,8 +36,8 @@ type Service struct {
 	db             archiver.IMySQLOps
 	rdb            *archiver.RedisAdapter
 	tz             *time.Location
-	dryRun         bool
 	cleanupRunning bool
+	reporting      reporting.IReporting
 }
 
 func (job *Service) Start(ctx context.Context) {
@@ -73,7 +74,7 @@ func (job *Service) performCleanup() error {
 	t0 := time.Now()
 
 	birthLimit := time.Now().In(job.tz).Add(-job.conf.MinAgeUnvisited())
-	var stats CleanupStats
+	var stats reporting.CleanupStats
 	lastDateRaw, err := job.rdb.Get(job.conf.StatusKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch last check date from Redis (key %s): %w", job.conf.StatusKey, err)
@@ -190,11 +191,18 @@ func (job *Service) performCleanup() error {
 	return nil
 }
 
-func NewService(db archiver.IMySQLOps, rdb *archiver.RedisAdapter, conf Conf, tz *time.Location) *Service {
+func NewService(
+	db archiver.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+	reporting reporting.IReporting,
+	conf Conf,
+	tz *time.Location,
+) *Service {
 	return &Service{
-		conf: conf,
-		db:   db,
-		rdb:  rdb,
-		tz:   tz,
+		conf:      conf,
+		db:        db,
+		rdb:       rdb,
+		reporting: reporting,
+		tz:        tz,
 	}
 }

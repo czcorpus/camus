@@ -79,7 +79,7 @@ func (job *StatusWriter) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (ds *StatusWriter) WriteOperationsStatus(item BgJobStats) {
+func (ds *StatusWriter) WriteOperationsStatus(item OpStats) {
 	if ds.tableWriter != nil {
 		ds.dataCh <- *ds.tableWriter.NewEntry(time.Now()).
 			Int("numMerged", item.NumMerged).

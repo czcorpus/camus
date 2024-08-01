@@ -53,7 +53,13 @@ type service interface {
 	Stop(ctx context.Context) error
 }
 
-func createArchiver(db archiver.IMySQLOps, rdb *archiver.RedisAdapter, conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
+func createArchiver(
+	db archiver.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+	reporting reporting.IReporting,
+	conf *cnf.Conf,
+	loadLastN int,
+) *archiver.ArchKeeper {
 	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to initialize deduplicator")
@@ -70,6 +76,7 @@ func createArchiver(db archiver.IMySQLOps, rdb *archiver.RedisAdapter, conf *cnf
 		rdb,
 		db,
 		dedup,
+		reporting,
 		conf.TimezoneLocation(),
 		time.Duration(conf.CheckIntervalSecs)*time.Second,
 		conf.CheckIntervalChunk,
@@ -130,22 +137,6 @@ func main() {
 		}
 		rdb := archiver.NewRedisAdapter(conf.Redis)
 
-		var dbOps archiver.IMySQLOps
-		dbOpsRaw := archiver.NewMySQLOps(db, conf.TimezoneLocation())
-		if *dryRun {
-			dbOps = archiver.NewMySQLDryRun(dbOpsRaw)
-
-		} else {
-			dbOps = dbOpsRaw
-		}
-
-		arch := createArchiver(dbOps, rdb, conf, *loadLastN)
-
-		as := &apiServer{
-			arch: arch,
-			conf: conf,
-		}
-
 		var reportingService reporting.IReporting
 		if conf.Reporting.Host != "" {
 			reportingService, err = reporting.NewStatusWriter(
@@ -163,7 +154,24 @@ func main() {
 			reportingService = &reporting.DummyWriter{}
 		}
 
-		cln := cleaner.NewService(dbOps, rdb, conf.Cleaner, conf.TimezoneLocation())
+		var dbOps archiver.IMySQLOps
+		dbOpsRaw := archiver.NewMySQLOps(db, conf.TimezoneLocation())
+		if *dryRun {
+			dbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+
+		} else {
+			dbOps = dbOpsRaw
+		}
+
+		arch := createArchiver(dbOps, rdb, reportingService, conf, *loadLastN)
+
+		cln := cleaner.NewService(dbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+
+		as := &apiServer{
+			arch: arch,
+			conf: conf,
+		}
+
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 		services := []service{arch, cln, as, reportingService}
