@@ -20,6 +20,7 @@ import (
 	"camus/archiver"
 	"camus/cleaner"
 	"camus/cnf"
+	"camus/reporting"
 	"context"
 	"flag"
 	"fmt"
@@ -145,10 +146,27 @@ func main() {
 			conf: conf,
 		}
 
+		var reportingService reporting.IReporting
+		if conf.Reporting.Host != "" {
+			reportingService, err = reporting.NewStatusWriter(
+				conf.Reporting,
+				conf.TimezoneLocation(),
+				func(err error) {},
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to initialize reporting")
+				os.Exit(1)
+				return
+			}
+
+		} else {
+			reportingService = &reporting.DummyWriter{}
+		}
+
 		cln := cleaner.NewService(dbOps, rdb, conf.Cleaner, conf.TimezoneLocation())
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		services := []service{arch, cln, as}
+		services := []service{arch, cln, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
 		}

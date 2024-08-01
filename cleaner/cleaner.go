@@ -30,12 +30,6 @@ const (
 	dtFormat = "2006-01-02T15:04:05"
 )
 
-type CleanupStats struct {
-	NumFetched int `json:"numFetched"`
-	NumMerged  int `json:"numMerged"`
-	NumErrors  int `json:"numErrors"`
-}
-
 type Service struct {
 	conf           Conf
 	db             archiver.IMySQLOps

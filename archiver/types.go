@@ -22,20 +22,6 @@ import (
 	"time"
 )
 
-type BgJobStats struct {
-	NumErrors   int `json:"numErrors"`
-	NumMerged   int `json:"numMerged"`
-	NumInserted int `json:"numInserted"`
-	NumFetched  int `json:"numFetched"`
-}
-
-func (bgs *BgJobStats) UpdateBy(other BgJobStats) {
-	bgs.NumErrors += other.NumErrors
-	bgs.NumMerged += other.NumMerged
-	bgs.NumInserted += other.NumInserted
-	bgs.NumFetched += other.NumFetched
-}
-
 // -------------------------
 
 type Deduplication struct {

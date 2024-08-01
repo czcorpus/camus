@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/czcorpus/cnc-gokit/logging"
+	"github.com/czcorpus/hltscl"
 	"github.com/rs/zerolog/log"
 )
 
@@ -53,6 +54,7 @@ type Conf struct {
 	CheckIntervalChunk     int                 `json:"checkIntervalChunk"`
 	DDStateFilePath        string              `json:"ddStateFilePath"`
 	Cleaner                cleaner.Conf        `json:"cleaner"`
+	Reporting              hltscl.PgConf       `json:"reporting"`
 }
 
 func (conf *Conf) TimezoneLocation() *time.Location {
