@@ -100,6 +100,9 @@ func (job *Service) performCleanup() error {
 	}
 	visitedIDs := collections.NewSet[string]()
 	for _, item := range items {
+		if visitedIDs.Contains(item.ID) {
+			continue // already resolved duplicity
+		}
 		visitedIDs.Add(item.ID)
 		stats.NumFetched++
 		variants, err := job.db.LoadRecordsByID(item.ID)
