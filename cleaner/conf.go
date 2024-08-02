@@ -17,6 +17,7 @@
 package cleaner
 
 import (
+	"camus/util"
 	"fmt"
 	"time"
 
@@ -50,12 +51,29 @@ func (conf Conf) MinAgeUnvisited() time.Duration {
 	return time.Duration(conf.MinAgeDaysUnvisited) * time.Hour * 24
 }
 
-func (conf *Conf) ValidateAndDefaults() error {
+func (conf *Conf) ValidateAndDefaults(opsCheckIntervalSecs int) error {
 	if conf.CheckIntervalSecs < minAllowedCheckInterval {
 		return fmt.Errorf(
 			"invalid value %d for checkIntervalSecs (must be >= %d)",
 			conf.CheckIntervalSecs, minAllowedCheckInterval,
 		)
+	}
+	tmp, err := util.NearestPrime(conf.CheckIntervalSecs)
+	if err != nil {
+		return fmt.Errorf("failed to tune cleaner timing: %w", err)
+	}
+	if tmp == opsCheckIntervalSecs {
+		tmp, err = util.NearestPrime(tmp + 1)
+		if err != nil {
+			return fmt.Errorf("failed to tune cleaner timing: %w", err)
+		}
+	}
+	if tmp != conf.CheckIntervalSecs {
+		log.Warn().
+			Int("oldValue", conf.CheckIntervalSecs).
+			Int("newValue", tmp).
+			Msg("tuned value of checkIntervalSecs so it does not overlap with ops interval")
+		conf.CheckIntervalSecs = tmp
 	}
 	if conf.NumProcessItemsPerTick < 1 || conf.NumProcessItemsPerTick > 5000 {
 		return fmt.Errorf("invalid value for numProcessItemsPerTick (must be between 1 and 5000)")
