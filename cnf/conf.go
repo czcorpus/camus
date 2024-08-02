@@ -19,6 +19,7 @@ package cnf
 import (
 	"camus/archiver"
 	"camus/cleaner"
+	"camus/util"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -108,11 +109,22 @@ func ValidateAndDefaults(conf *Conf) {
 		log.Fatal().Msg("missing path to deduplicator state file (ddStateFilePath)")
 	}
 
+	tmp, err := util.NearestPrime(conf.CheckIntervalSecs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to tune ops timing")
+	}
+	if tmp != conf.CheckIntervalSecs {
+		log.Warn().
+			Int("oldValue", conf.CheckIntervalSecs).
+			Int("newValue", tmp).
+			Msg("tuned value of checkIntervalSecs so it cannot be easily overlapped by other timers")
+		conf.CheckIntervalSecs = tmp
+	}
 	if err := conf.Redis.ValidateAndDefaults(); err != nil {
 		log.Fatal().Err(err).Msg("invalid Redis configuration")
 	}
 
-	if err := conf.Cleaner.ValidateAndDefaults(); err != nil {
+	if err := conf.Cleaner.ValidateAndDefaults(conf.CheckIntervalSecs); err != nil {
 		log.Fatal().Err(err).Msg("invalid Clean configuration")
 	}
 }
