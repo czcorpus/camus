@@ -42,7 +42,8 @@ create table camus_cleanup_stats (
   "time" timestamp with time zone NOT NULL,
   num_fetched int,
   num_merged int,
-  num_errors int
+  num_errors int,
+  num_deleted int
 );
 
 select create_hypertable('camus_cleanup_stats', 'time');
@@ -97,7 +98,8 @@ func (ds *StatusWriter) WriteCleanupStatus(item CleanupStats) {
 		ds.cleanupDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
 			Int("num_errors", item.NumErrors).
 			Int("num_fetched", item.NumFetched).
-			Int("num_merged", item.NumMerged)
+			Int("num_merged", item.NumMerged).
+			Int("num_deleted", item.NumDeleted)
 	}
 }
 
