@@ -40,6 +40,7 @@ type CleanupStats struct {
 	NumFetched int `json:"numFetched"`
 	NumMerged  int `json:"numMerged"`
 	NumErrors  int `json:"numErrors"`
+	NumDeleted int `json:"numDeleted"`
 }
 
 // ------------

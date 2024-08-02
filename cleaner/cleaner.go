@@ -104,6 +104,9 @@ func (job *Service) performCleanup() error {
 			continue // already resolved duplicity
 		}
 		visitedIDs.Add(item.ID)
+		if item.Permanent == 1 {
+			continue
+		}
 		stats.NumFetched++
 		variants, err := job.db.LoadRecordsByID(item.ID)
 		if err != nil {
@@ -169,6 +172,7 @@ func (job *Service) performCleanup() error {
 					stats.NumErrors++
 					continue
 				}
+				stats.NumDeleted++
 			}
 
 		} else {
@@ -187,6 +191,7 @@ func (job *Service) performCleanup() error {
 					stats.NumErrors++
 					continue
 				}
+				stats.NumDeleted++
 			}
 		}
 	}
