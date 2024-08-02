@@ -18,12 +18,14 @@ package cnf
 
 import (
 	"camus/archiver"
+	"camus/cleaner"
 	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/czcorpus/cnc-gokit/logging"
+	"github.com/czcorpus/hltscl"
 	"github.com/rs/zerolog/log"
 )
 
@@ -51,6 +53,8 @@ type Conf struct {
 	CheckIntervalSecs      int                 `json:"checkIntervalSecs"`
 	CheckIntervalChunk     int                 `json:"checkIntervalChunk"`
 	DDStateFilePath        string              `json:"ddStateFilePath"`
+	Cleaner                cleaner.Conf        `json:"cleaner"`
+	Reporting              hltscl.PgConf       `json:"reporting"`
 }
 
 func (conf *Conf) TimezoneLocation() *time.Location {
@@ -106,5 +110,9 @@ func ValidateAndDefaults(conf *Conf) {
 
 	if err := conf.Redis.ValidateAndDefaults(); err != nil {
 		log.Fatal().Err(err).Msg("invalid Redis configuration")
+	}
+
+	if err := conf.Cleaner.ValidateAndDefaults(); err != nil {
+		log.Fatal().Err(err).Msg("invalid Clean configuration")
 	}
 }

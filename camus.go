@@ -18,7 +18,9 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cleaner"
 	"camus/cnf"
+	"camus/reporting"
 	"context"
 	"flag"
 	"fmt"
@@ -51,14 +53,13 @@ type service interface {
 	Stop(ctx context.Context) error
 }
 
-func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
-	rds := archiver.NewRedisAdapter(conf.Redis)
-	db, err := archiver.DBOpen(conf.MySQL)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to open SQL database")
-		os.Exit(1)
-		return nil
-	}
+func createArchiver(
+	db archiver.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+	reporting reporting.IReporting,
+	conf *cnf.Conf,
+	loadLastN int,
+) *archiver.ArchKeeper {
 	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to initialize deduplicator")
@@ -71,15 +72,15 @@ func runArchiver(conf *cnf.Conf, loadLastN int) *archiver.ArchKeeper {
 			os.Exit(1)
 		}
 	}
-	job := archiver.NewArchKeeper(
-		rds,
+	return archiver.NewArchKeeper(
+		rdb,
 		db,
 		dedup,
+		reporting,
 		conf.TimezoneLocation(),
 		time.Duration(conf.CheckIntervalSecs)*time.Second,
 		conf.CheckIntervalChunk,
 	)
-	return job
 }
 
 func cleanVersionInfo(v string) string {
@@ -101,6 +102,10 @@ func main() {
 	}
 	loadLastN := flag.Int(
 		"load-last-n", 0, "Load last N items from archive database to start with deduplication checking early")
+	dryRun := flag.Bool(
+		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
+	dryRunCleaner := flag.Bool(
+		"dry-run-cleaner", false, "If set, the Cleaner service will just report operations to log without writing them to database")
 	flag.Parse()
 	action := flag.Arg(0)
 	if action == "version" {
@@ -126,14 +131,60 @@ func main() {
 
 	switch action {
 	case "start":
-		arch := runArchiver(conf, *loadLastN)
+		db, err := archiver.DBOpen(conf.MySQL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to open SQL database")
+			os.Exit(1)
+			return
+		}
+		rdb := archiver.NewRedisAdapter(conf.Redis)
+
+		var reportingService reporting.IReporting
+		if conf.Reporting.Host != "" {
+			reportingService, err = reporting.NewStatusWriter(
+				conf.Reporting,
+				conf.TimezoneLocation(),
+				func(err error) {},
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to initialize reporting")
+				os.Exit(1)
+				return
+			}
+
+		} else {
+			reportingService = &reporting.DummyWriter{}
+		}
+
+		var dbOps archiver.IMySQLOps
+		dbOpsRaw := archiver.NewMySQLOps(db, conf.TimezoneLocation())
+		if *dryRun {
+			dbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+
+		} else {
+			dbOps = dbOpsRaw
+		}
+
+		arch := createArchiver(dbOps, rdb, reportingService, conf, *loadLastN)
+
+		var cleanerDbOps archiver.IMySQLOps
+		if *dryRunCleaner {
+			cleanerDbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+
+		} else {
+			cleanerDbOps = dbOps
+		}
+
+		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+
 		as := &apiServer{
 			arch: arch,
 			conf: conf,
 		}
+
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		services := []service{arch, as}
+		services := []service{arch, cln, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
 		}
