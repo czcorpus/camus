@@ -48,12 +48,16 @@ func (job *Service) Start(ctx context.Context) {
 			case <-ctx.Done():
 				log.Info().Msg("about to close Cleaner")
 				return
-			case <-ticker.C:
+			case t := <-ticker.C:
 				if job.cleanupRunning {
 					log.Warn().Msg("cannot run next cleanup - the previous not finished yet")
 
 				} else {
-					err := job.performCleanup()
+					numProc := job.conf.NumProcessItemsPerTick
+					if TimeIsAtNight(t) {
+						numProc = job.conf.NumProcessItemsPerTickNight
+					}
+					err := job.performCleanup(numProc)
 					if err != nil {
 						log.Error().Err(err).Msg("failed to perform cleanup")
 					}
@@ -68,7 +72,7 @@ func (job *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (job *Service) performCleanup() error {
+func (job *Service) performCleanup(itemsToProc int) error {
 	job.cleanupRunning = true
 	defer func() { job.cleanupRunning = false }()
 	t0 := time.Now()
@@ -88,9 +92,9 @@ func (job *Service) performCleanup() error {
 	}
 	log.Info().
 		Time("lastCheck", lastDate).
-		Int("itemsToLoad", job.conf.NumProcessItemsPerTick).
+		Int("itemsToLoad", itemsToProc).
 		Msg("preparing for archive cleanup")
-	items, err := job.db.LoadRecordsFromDate(lastDate, job.conf.NumProcessItemsPerTick)
+	items, err := job.db.LoadRecordsFromDate(lastDate, itemsToProc)
 	if err != nil {
 		return fmt.Errorf("failed to load requested items for cleanup from database: %w", err)
 	}

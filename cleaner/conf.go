@@ -27,13 +27,19 @@ const (
 	dfltStatusKey            = "camus_cleanup_status"
 	minAllowedCheckInterval  = 10
 	minAgeDaysUnvisitedLimit = 30 //365
+	dfltNightItemsIncrease   = 2
 )
 
+func TimeIsAtNight(t time.Time) bool {
+	return 22 <= t.Hour() && t.Hour() <= 5
+}
+
 type Conf struct {
-	CheckIntervalSecs      int    `json:"checkIntervalSecs"`
-	NumProcessItemsPerTick int    `json:"numProcessItemsPerTick"`
-	StatusKey              string `json:"statusKey"`
-	MinAgeDaysUnvisited    int    `json:"minAgeDaysUnvisited"`
+	CheckIntervalSecs           int    `json:"checkIntervalSecs"`
+	NumProcessItemsPerTick      int    `json:"numProcessItemsPerTick"`
+	NumProcessItemsPerTickNight int    `json:"numProcessItemsPerTickNight"`
+	StatusKey                   string `json:"statusKey"`
+	MinAgeDaysUnvisited         int    `json:"minAgeDaysUnvisited"`
 }
 
 func (conf Conf) CheckInterval() time.Duration {
@@ -53,6 +59,12 @@ func (conf *Conf) ValidateAndDefaults() error {
 	}
 	if conf.NumProcessItemsPerTick < 1 || conf.NumProcessItemsPerTick > 5000 {
 		return fmt.Errorf("invalid value for numProcessItemsPerTick (must be between 1 and 5000)")
+	}
+	if conf.NumProcessItemsPerTickNight == 0 {
+		conf.NumProcessItemsPerTickNight = conf.NumProcessItemsPerTick * dfltNightItemsIncrease
+		log.Warn().
+			Int("value", conf.NumProcessItemsPerTickNight).
+			Msg("cleanup configuration `numProcessItemsPerTickNight` not defined - using calculated default")
 	}
 	if conf.StatusKey == "" {
 		log.Warn().Str("value", dfltStatusKey).Msg("cleanup configuration `statusKey` missing, using default")
