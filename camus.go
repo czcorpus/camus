@@ -104,6 +104,8 @@ func main() {
 		"load-last-n", 0, "Load last N items from archive database to start with deduplication checking early")
 	dryRun := flag.Bool(
 		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
+	dryRunCleaner := flag.Bool(
+		"dry-run-cleaner", false, "If set, the Cleaner service will just report operations to log without writing them to database")
 	flag.Parse()
 	action := flag.Arg(0)
 	if action == "version" {
@@ -165,7 +167,15 @@ func main() {
 
 		arch := createArchiver(dbOps, rdb, reportingService, conf, *loadLastN)
 
-		cln := cleaner.NewService(dbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+		var cleanerDbOps archiver.IMySQLOps
+		if *dryRunCleaner {
+			cleanerDbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+
+		} else {
+			cleanerDbOps = dbOps
+		}
+
+		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
 		as := &apiServer{
 			arch: arch,

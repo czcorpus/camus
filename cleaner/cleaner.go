@@ -89,10 +89,14 @@ func (job *Service) performCleanup() error {
 	log.Info().
 		Time("lastCheck", lastDate).
 		Int("itemsToLoad", job.conf.NumProcessItemsPerTick).
-		Msg("performing archive cleanup")
+		Msg("preparing for archive cleanup")
 	items, err := job.db.LoadRecordsFromDate(lastDate, job.conf.NumProcessItemsPerTick)
 	if err != nil {
 		return fmt.Errorf("failed to load requested items for cleanup from database: %w", err)
+	}
+	if len(items) == 0 {
+		log.Warn().Time("srchTo", lastDate).Msg("no more records found for cleanup")
+		return nil
 	}
 	visitedIDs := collections.NewSet[string]()
 	for _, item := range items {
@@ -188,6 +192,7 @@ func (job *Service) performCleanup() error {
 		Any("stats", stats).
 		Float64("procTime", time.Since(t0).Seconds()).
 		Msg("cleanup done")
+	job.reporting.WriteCleanupStatus(stats)
 	return nil
 }
 

@@ -170,6 +170,7 @@ func (job *ArchKeeper) performCheck() error {
 		Int("numErrors", currStats.NumErrors).
 		Int("numFetched", numFetched).
 		Msg("regular archiving report")
+	job.reporting.WriteOperationsStatus(currStats)
 	job.stats.UpdateBy(currStats)
 	return nil
 }
