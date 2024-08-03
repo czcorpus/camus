@@ -32,7 +32,7 @@ const (
 )
 
 func TimeIsAtNight(t time.Time) bool {
-	return 22 <= t.Hour() && t.Hour() <= 5
+	return t.Hour() >= 22 || t.Hour() <= 5
 }
 
 type Conf struct {
