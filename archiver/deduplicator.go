@@ -98,7 +98,7 @@ func (dd *Deduplicator) preloadLastNItems() error {
 		return fmt.Errorf("deduplicator failed to preload last N items: %w", err)
 	}
 	for _, item := range items {
-		dd.Add(item.ID)
+		dd.knownIDs.AddString(item.ID) // Note: cannot use own dd.Add here as it won't get a lock
 	}
 	log.Debug().
 		Int("numItems", dd.conf.PreloadLastNItems).
