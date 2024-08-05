@@ -19,6 +19,7 @@ package main
 import (
 	"camus/archiver"
 	"camus/cleaner"
+	"camus/cncdb"
 	"camus/cnf"
 	"camus/reporting"
 	"context"
@@ -54,23 +55,16 @@ type service interface {
 }
 
 func createArchiver(
-	db archiver.IMySQLOps,
+	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
 	reporting reporting.IReporting,
 	conf *cnf.Conf,
-	loadLastN int,
 ) *archiver.ArchKeeper {
-	dedup, err := archiver.NewDeduplicator(db, conf.TimezoneLocation(), conf.DDStateFilePath)
+	dedup, err := archiver.NewDeduplicator(db, conf.Archiver, conf.TimezoneLocation())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to initialize deduplicator")
 		os.Exit(1)
 		return nil
-	}
-	if loadLastN > 0 {
-		if err := dedup.PreloadLastNItems(loadLastN); err != nil {
-			log.Error().Err(err).Msg("Failed to preload items")
-			os.Exit(1)
-		}
 	}
 	return archiver.NewArchKeeper(
 		rdb,
@@ -78,8 +72,7 @@ func createArchiver(
 		dedup,
 		reporting,
 		conf.TimezoneLocation(),
-		time.Duration(conf.CheckIntervalSecs)*time.Second,
-		conf.CheckIntervalChunk,
+		conf.Archiver,
 	)
 }
 
@@ -100,8 +93,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s [options] version\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
-	loadLastN := flag.Int(
-		"load-last-n", 0, "Load last N items from archive database to start with deduplication checking early")
 	dryRun := flag.Bool(
 		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
 	dryRunCleaner := flag.Bool(
@@ -131,7 +122,7 @@ func main() {
 
 	switch action {
 	case "start":
-		db, err := archiver.DBOpen(conf.MySQL)
+		db, err := cncdb.DBOpen(conf.MySQL)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to open SQL database")
 			os.Exit(1)
@@ -156,20 +147,20 @@ func main() {
 			reportingService = &reporting.DummyWriter{}
 		}
 
-		var dbOps archiver.IMySQLOps
-		dbOpsRaw := archiver.NewMySQLOps(db, conf.TimezoneLocation())
+		var dbOps cncdb.IMySQLOps
+		dbOpsRaw := cncdb.NewMySQLOps(db, conf.TimezoneLocation())
 		if *dryRun {
-			dbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+			dbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
 
 		} else {
 			dbOps = dbOpsRaw
 		}
 
-		arch := createArchiver(dbOps, rdb, reportingService, conf, *loadLastN)
+		arch := createArchiver(dbOps, rdb, reportingService, conf)
 
-		var cleanerDbOps archiver.IMySQLOps
+		var cleanerDbOps cncdb.IMySQLOps
 		if *dryRunCleaner {
-			cleanerDbOps = archiver.NewMySQLDryRun(dbOpsRaw)
+			cleanerDbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
 
 		} else {
 			cleanerDbOps = dbOps

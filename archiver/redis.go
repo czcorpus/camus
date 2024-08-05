@@ -17,6 +17,7 @@
 package archiver
 
 import (
+	"camus/cncdb"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -91,7 +92,7 @@ func (rd *RedisAdapter) NextNItems(n int64) ([]queueRecord, error) {
 	return ans, nil
 }
 
-func (rd *RedisAdapter) AddError(item queueRecord, rec *ArchRecord) error {
+func (rd *RedisAdapter) AddError(item queueRecord, rec *cncdb.ArchRecord) error {
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("failed to add error record %s: %w", item.Key, err)
@@ -114,12 +115,12 @@ func (rd *RedisAdapter) mkKey(id string) string {
 	return fmt.Sprintf("concordance:%s", id)
 }
 
-func (rd *RedisAdapter) GetConcRecord(id string) (ArchRecord, error) {
+func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
 	ans := rd.redis.Get(rd.ctx, rd.mkKey(id))
 	if ans.Err() != nil {
-		return ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
+		return cncdb.ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
 	}
-	return ArchRecord{
+	return cncdb.ArchRecord{
 		ID:   id,
 		Data: ans.Val(),
 	}, nil

@@ -31,10 +31,6 @@ const (
 	dfltNightItemsIncrease   = 2
 )
 
-func TimeIsAtNight(t time.Time) bool {
-	return t.Hour() >= 22 || t.Hour() <= 5
-}
-
 type Conf struct {
 	CheckIntervalSecs           int    `json:"checkIntervalSecs"`
 	NumProcessItemsPerTick      int    `json:"numProcessItemsPerTick"`
@@ -52,6 +48,9 @@ func (conf Conf) MinAgeUnvisited() time.Duration {
 }
 
 func (conf *Conf) ValidateAndDefaults(opsCheckIntervalSecs int) error {
+	if conf == nil {
+		return fmt.Errorf("missing `cleaner` section")
+	}
 	if conf.CheckIntervalSecs < minAllowedCheckInterval {
 		return fmt.Errorf(
 			"invalid value %d for checkIntervalSecs (must be >= %d)",

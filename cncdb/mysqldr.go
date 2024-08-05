@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archiver
+package cncdb
 
 import (
 	"time"
@@ -22,6 +22,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// MySQLDryRun is a dry-run mode version of mysql adapter. It performs
+// read operations just like normal adapter but any modifying operation
+// just logs its information.
 type MySQLDryRun struct {
 	db *MySQLOps
 }
@@ -60,6 +63,10 @@ func (db *MySQLDryRun) RemoveRecordsByID(concID string) error {
 func (db *MySQLDryRun) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
 	log.Info().Msgf("DRY-RUN>>> DeduplicateInArchive(..., ArchRecord{ID: %s})", rec.ID)
 	return ArchRecord{}, nil
+}
+
+func (ops *MySQLDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
+	return ops.db.GetArchSizesByYears(forceLoad)
 }
 
 func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {

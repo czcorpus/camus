@@ -18,6 +18,7 @@ package cleaner
 
 import (
 	"camus/archiver"
+	"camus/cncdb"
 	"camus/reporting"
 	"context"
 	"fmt"
@@ -33,7 +34,7 @@ const (
 
 type Service struct {
 	conf           Conf
-	db             archiver.IMySQLOps
+	db             cncdb.IMySQLOps
 	rdb            *archiver.RedisAdapter
 	tz             *time.Location
 	cleanupRunning bool
@@ -54,7 +55,7 @@ func (job *Service) Start(ctx context.Context) {
 
 				} else {
 					numProc := job.conf.NumProcessItemsPerTick
-					if TimeIsAtNight(t) {
+					if cncdb.TimeIsAtNight(t) {
 						numProc = job.conf.NumProcessItemsPerTickNight
 					}
 					err := job.performCleanup(numProc)
@@ -128,7 +129,7 @@ func (job *Service) performCleanup(itemsToProc int) error {
 			continue
 		}
 
-		err = archiver.ValidateQueryInstances(variants)
+		err = cncdb.ValidateQueryInstances(variants)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -209,7 +210,7 @@ func (job *Service) performCleanup(itemsToProc int) error {
 }
 
 func NewService(
-	db archiver.IMySQLOps,
+	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
 	reporting reporting.IReporting,
 	conf Conf,

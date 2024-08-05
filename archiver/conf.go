@@ -17,36 +17,54 @@
 package archiver
 
 import (
+	"camus/util"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-type RedisConf struct {
-	Host             string `json:"host"`
-	Port             int    `json:"port"`
-	DB               int    `json:"db"`
-	Password         string `json:"password"`
-	QueueKey         string `json:"queueKey"`
-	FailedQueueKey   string `json:"failedQueueKey"`
-	FailedRecordsKey string `json:"failedRecordsKey"`
+const (
+	dfltPreloadLastNItems = 500
+)
+
+type Conf struct {
+	DDStateFilePath    string `json:"ddStateFilePath"`
+	CheckIntervalSecs  int    `json:"checkIntervalSecs"`
+	CheckIntervalChunk int    `json:"checkIntervalChunk"`
+	PreloadLastNItems  int    `json:"preloadLastNItems"`
 }
 
-func (conf *RedisConf) ValidateAndDefaults() error {
-	if conf.DB == 0 {
-		return fmt.Errorf("missing Redis configuration: `db`")
+func (conf *Conf) CheckInterval() time.Duration {
+	return time.Duration(conf.CheckIntervalSecs) * time.Second
+}
+
+func (conf *Conf) ValidateAndDefaults() error {
+	if conf == nil {
+		return fmt.Errorf("missing `archiver` section")
 	}
-	if conf.QueueKey == "" {
-		return fmt.Errorf("missing Redis configuration: `queueKey`")
+	if conf.DDStateFilePath == "" {
+		return fmt.Errorf("missing path to deduplicator state file (ddStateFilePath)")
 	}
-	if conf.FailedQueueKey == "" {
-		conf.FailedQueueKey = conf.QueueKey + "_failed"
+
+	tmp, err := util.NearestPrime(conf.CheckIntervalSecs)
+	if err != nil {
+		return fmt.Errorf("failed to tune ops timing: %w", err)
+	}
+	if tmp != conf.CheckIntervalSecs {
 		log.Warn().
-			Str("value", conf.FailedQueueKey).
-			Msg("Redis configuration `failedQueueKey` missing - using default")
+			Int("oldValue", conf.CheckIntervalSecs).
+			Int("newValue", tmp).
+			Msg("tuned value of checkIntervalSecs so it cannot be easily overlapped by other timers")
+		conf.CheckIntervalSecs = tmp
 	}
-	if conf.FailedRecordsKey == "" {
-		return fmt.Errorf("missing Redis configuration: `failedRecordsKey`")
+
+	if conf.PreloadLastNItems == 0 {
+		conf.PreloadLastNItems = dfltPreloadLastNItems
+		log.Warn().
+			Int("value", conf.PreloadLastNItems).
+			Msg("archiver value `preloadLastNItems` not set, using default")
 	}
+
 	return nil
 }

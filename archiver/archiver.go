@@ -17,6 +17,7 @@
 package archiver
 
 import (
+	"camus/cncdb"
 	"camus/reporting"
 	"context"
 	"fmt"
@@ -25,19 +26,35 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ArchKeeper handles continuous operations related
+// to the concordance archive (contrary to the name, it
+// also contains word lists, paradigm. queries and keyword
+// queries).
+// The main responsibility of ArchKeeper is to read queued
+// query IDs, read them ASAP from Redis and store them
+// to kontext_conc_persistence SQL table.
+// Due to the nature of the partitioning of the table, ArchKeeper
+// must also involve some deduplication to prevent extensive
+// growth of duplicate records. It is not expected that
+// ArchKeeper will catch 100% of duplicates because there is
+// also a cleanup job that removes old unused records and
+// for each checked record, it also performs a deduplication. But
+// the job affects only years old records so we still need
+// to prevent (at least some) recent duplicates so that the database
+// is reasonably large.
 type ArchKeeper struct {
-	redis              *RedisAdapter
-	db                 IMySQLOps
-	reporting          reporting.IReporting
-	checkInterval      time.Duration
-	checkIntervalChunk int
-	dedup              *Deduplicator
-	tz                 *time.Location
-	stats              reporting.OpStats
+	redis     *RedisAdapter
+	db        cncdb.IMySQLOps
+	reporting reporting.IReporting
+	conf      *Conf
+	dedup     *Deduplicator
+	tz        *time.Location
+	stats     reporting.OpStats
 }
 
+// Start starts the ArchKeeper service
 func (job *ArchKeeper) Start(ctx context.Context) {
-	ticker := time.NewTicker(job.checkInterval)
+	ticker := time.NewTicker(job.conf.CheckInterval())
 	go func() {
 		for {
 			select {
@@ -51,6 +68,7 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 	}()
 }
 
+// Stop stops the ArchKeeper service
 func (job *ArchKeeper) Stop(ctx context.Context) error {
 	log.Warn().Msg("stopping ArchKeeper")
 	if err := job.dedup.OnClose(); err != nil {
@@ -59,19 +77,30 @@ func (job *ArchKeeper) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (job *ArchKeeper) StoreToDisk() {
-
+// StoreToDisk stores current operations data from RAM
+// to a configured disk file.
+func (job *ArchKeeper) StoreToDisk() error {
+	return job.dedup.StoreToDisk()
 }
 
+// Reset clears current operations data stored in RAM
+// and initializes itself according to the configuration.
+func (job *ArchKeeper) Reset() error {
+	return job.dedup.Reset()
+}
+
+// GetStats returns statistics related to ArchKeeper operations.
+// We use it mainly for pushing stats to a TimescaleDB instance.
 func (job *ArchKeeper) GetStats() reporting.OpStats {
 	return job.stats
 }
 
-func (job *ArchKeeper) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error) {
 	return job.db.LoadRecordsByID(concID)
 }
 
-func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
+func (job *ArchKeeper) handleImplicitReq(
+	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
 
 	match, err := job.dedup.TestAndSolve(rec)
 	if err != nil {
@@ -106,7 +135,8 @@ func (job *ArchKeeper) handleImplicitReq(rec ArchRecord, item queueRecord, currS
 	return false
 }
 
-func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currStats *reporting.OpStats) {
+func (job *ArchKeeper) handleExplicitReq(
+	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) {
 	exists, err := job.db.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
@@ -132,7 +162,7 @@ func (job *ArchKeeper) handleExplicitReq(rec ArchRecord, item queueRecord, currS
 }
 
 func (job *ArchKeeper) performCheck() error {
-	items, err := job.redis.NextNItems(int64(job.checkIntervalChunk))
+	items, err := job.redis.NextNItems(int64(job.conf.CheckIntervalChunk))
 	log.Debug().
 		AnErr("error", err).
 		Int("itemsToProcess", len(items)).
@@ -175,26 +205,25 @@ func (job *ArchKeeper) performCheck() error {
 	return nil
 }
 
-func (job *ArchKeeper) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+func (job *ArchKeeper) DeduplicateInArchive(
+	curr []cncdb.ArchRecord, rec cncdb.ArchRecord) (cncdb.ArchRecord, error) {
 	return job.db.DeduplicateInArchive(curr, rec)
 }
 
 func NewArchKeeper(
 	redis *RedisAdapter,
-	db IMySQLOps,
+	db cncdb.IMySQLOps,
 	dedup *Deduplicator,
 	reporting reporting.IReporting,
 	tz *time.Location,
-	checkInterval time.Duration,
-	checkIntervalChunk int,
+	conf *Conf,
 ) *ArchKeeper {
 	return &ArchKeeper{
-		redis:              redis,
-		db:                 db,
-		dedup:              dedup,
-		reporting:          reporting,
-		tz:                 tz,
-		checkInterval:      checkInterval,
-		checkIntervalChunk: checkIntervalChunk,
+		redis:     redis,
+		db:        db,
+		dedup:     dedup,
+		reporting: reporting,
+		tz:        tz,
+		conf:      conf,
 	}
 }

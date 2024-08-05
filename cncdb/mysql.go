@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archiver
+package cncdb
 
 import (
 	"database/sql"
@@ -180,6 +180,28 @@ func (ops *MySQLOps) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (Ar
 			Str("data", ans.Data).
 			Msg("failed to insert merged record")
 		return ans, fmt.Errorf("failed to store merged record %s: %w", rec.ID, err)
+	}
+	return ans, nil
+}
+
+func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
+	if !forceLoad && !TimeIsAtNight(time.Now().In(ops.tz)) {
+		return [][2]int{}, ErrTooDemandingQuery
+	}
+	rows, err := ops.db.Query(
+		"SELECT COUNT(*), YEAR(created) AS yc " +
+			"FROM kontext_conc_persistence " +
+			"GROUP BY YEAR(created) ORDER BY yc")
+	if err != nil {
+		return [][2]int{}, fmt.Errorf("failed to fetch arch. sizes: %w", err)
+	}
+	ans := make([][2]int, 0, 30)
+	for rows.Next() {
+		var v, year int
+		if err := rows.Scan(&v, &year); err != nil {
+			return [][2]int{}, fmt.Errorf("failed to get values from arch. sizes row: %w", err)
+		}
+		ans = append(ans, [2]int{year, v})
 	}
 	return ans, nil
 }

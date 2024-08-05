@@ -14,15 +14,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archiver
+package cncdb
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var (
+	ErrTooDemandingQuery = errors.New("too demanding query")
+)
+
+func TimeIsAtNight(t time.Time) bool {
+	return t.Hour() >= 22 || t.Hour() <= 5
+}
 
 func MergeRecords(recs []ArchRecord, newRec ArchRecord, tz *time.Location) ArchRecord {
 	if len(recs) == 0 {

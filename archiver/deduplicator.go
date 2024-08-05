@@ -17,8 +17,10 @@
 package archiver
 
 import (
+	"camus/cncdb"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/bits-and-blooms/bloom"
@@ -32,20 +34,22 @@ const (
 )
 
 type Deduplicator struct {
-	items           *bloom.BloomFilter
-	concDB          IMySQLOps
-	tz              *time.Location
-	preloadLastN    int
-	storageFilePath string
+	knownIDs      *bloom.BloomFilter
+	knownIDsMutex *sync.RWMutex
+	concDB        cncdb.IMySQLOps
+	tz            *time.Location
+	conf          *Conf
 }
 
 func (dd *Deduplicator) StoreToDisk() error {
-	f, err := os.OpenFile(dd.storageFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	f, err := os.OpenFile(dd.conf.DDStateFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to store deduplicator state to disk: %w", err)
 	}
 	defer f.Close()
-	_, err = dd.items.WriteTo(f)
+	dd.knownIDsMutex.Lock()
+	defer dd.knownIDsMutex.Unlock()
+	_, err = dd.knownIDs.WriteTo(f)
 	if err != nil {
 		return fmt.Errorf("failed to store deduplicator state to disk: %w", err)
 	}
@@ -57,12 +61,14 @@ func (dd *Deduplicator) OnClose() error {
 }
 
 func (dd *Deduplicator) LoadFromDisk() error {
-	f, err := os.Open(dd.storageFilePath)
+	f, err := os.Open(dd.conf.DDStateFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load deduplicator state from disk: %w", err)
 	}
 	defer f.Close()
-	_, err = dd.items.ReadFrom(f)
+	dd.knownIDsMutex.Lock()
+	defer dd.knownIDsMutex.Unlock()
+	_, err = dd.knownIDs.ReadFrom(f)
 	if err != nil {
 		return fmt.Errorf("failed to load deduplicator state from disk: %w", err)
 	}
@@ -70,33 +76,40 @@ func (dd *Deduplicator) LoadFromDisk() error {
 }
 
 func (dd *Deduplicator) Add(concID string) {
-	dd.items.AddString(concID)
+	dd.knownIDsMutex.Lock()
+	defer dd.knownIDsMutex.Unlock()
+	dd.knownIDs.AddString(concID)
 }
 
 func (dd *Deduplicator) Reset() error {
 	log.Warn().Msg("performing deduplicator reset")
-	dd.items.ClearAll()
-	if dd.preloadLastN > 0 {
-		return dd.PreloadLastNItems(dd.preloadLastN)
+	dd.knownIDsMutex.Lock()
+	defer dd.knownIDsMutex.Unlock()
+	dd.knownIDs.ClearAll()
+	if dd.conf.PreloadLastNItems > 0 {
+		return dd.preloadLastNItems()
 	}
 	return nil
 }
 
-func (dd *Deduplicator) PreloadLastNItems(num int) error {
-	dd.preloadLastN = num
-	items, err := dd.concDB.LoadRecentNRecords(num)
+func (dd *Deduplicator) preloadLastNItems() error {
+	items, err := dd.concDB.LoadRecentNRecords(dd.conf.PreloadLastNItems)
 	if err != nil {
-		return fmt.Errorf("failed to preload last N items: %w", err)
+		return fmt.Errorf("deduplicator failed to preload last N items: %w", err)
 	}
 	for _, item := range items {
 		dd.Add(item.ID)
 	}
-	log.Debug().Int("numItems", num).Msg("preloaded items for better deduplication")
+	log.Debug().
+		Int("numItems", dd.conf.PreloadLastNItems).
+		Msg("preloaded items for better deduplication")
 	return nil
 }
 
 func (dd *Deduplicator) TestRecord(concID string) bool {
-	return dd.items.TestString(concID)
+	dd.knownIDsMutex.RLock()
+	defer dd.knownIDsMutex.RUnlock()
+	return dd.knownIDs.TestString(concID)
 }
 
 // TestAndSolve looks for whether the record has been recently used and if so
@@ -105,8 +118,8 @@ func (dd *Deduplicator) TestRecord(concID string) bool {
 // The "recently used" means that we keep track of recently stored IDs and test
 // for them only. I.e. we do not perform full search in query persistence db
 // for each and every concID we want to store.
-func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
-	if !dd.items.TestString(newRec.ID) {
+func (dd *Deduplicator) TestAndSolve(newRec cncdb.ArchRecord) (bool, error) {
+	if !dd.TestRecord(newRec.ID) {
 		return false, nil
 	}
 	recs, err := dd.concDB.LoadRecordsByID(newRec.ID)
@@ -123,11 +136,11 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 		Str("concId", newRec.ID).
 		Int("numVariants", len(recs)).
 		Msg("found archived record")
-	queryTest := make(map[string][]ArchRecord)
+	queryTest := make(map[string][]cncdb.ArchRecord)
 	for _, rec := range recs {
 		_, ok := queryTest[rec.Data]
 		if !ok {
-			queryTest[rec.Data] = make([]ArchRecord, 0, 10)
+			queryTest[rec.Data] = make([]cncdb.ArchRecord, 0, 10)
 		}
 		queryTest[rec.Data] = append(queryTest[rec.Data], rec)
 	}
@@ -154,15 +167,17 @@ func (dd *Deduplicator) TestAndSolve(newRec ArchRecord) (bool, error) {
 	return true, err
 }
 
-func NewDeduplicator(concDB IMySQLOps, loc *time.Location, stateFilePath string) (*Deduplicator, error) {
+func NewDeduplicator(
+	concDB cncdb.IMySQLOps, conf *Conf, loc *time.Location) (*Deduplicator, error) {
 	filter := bloom.NewWithEstimates(bloomFilterNumBits, bloomFilterProbCollision)
 	d := &Deduplicator{
-		tz:              loc,
-		items:           filter,
-		concDB:          concDB,
-		storageFilePath: stateFilePath,
+		tz:            loc,
+		knownIDs:      filter,
+		concDB:        concDB,
+		conf:          conf,
+		knownIDsMutex: &sync.RWMutex{},
 	}
-	isf, err := fs.IsFile(stateFilePath)
+	isf, err := fs.IsFile(conf.DDStateFilePath)
 	if err != nil {
 		return d, fmt.Errorf("failed to init Deduplicator: %w", err)
 	}
@@ -170,7 +185,7 @@ func NewDeduplicator(concDB IMySQLOps, loc *time.Location, stateFilePath string)
 		if err := d.LoadFromDisk(); err != nil {
 			return d, fmt.Errorf("failed to init Deduplicator: %w", err)
 		}
-		log.Info().Str("file", stateFilePath).Msg("loaded previously stored dedup. state")
+		log.Info().Str("file", conf.DDStateFilePath).Msg("loaded previously stored dedup. state")
 	}
 	return d, nil
 }

@@ -14,10 +14,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archiver
+package cncdb
 
 import "time"
 
+// IMySQLOps is an abstract interface for high level
+// database operations. We need it mainly to allow
+// injecting "dummy" database adapter for "dry-run" mode.
 type IMySQLOps interface {
 	LoadRecentNRecords(num int) ([]ArchRecord, error)
 	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error)
@@ -27,4 +30,10 @@ type IMySQLOps interface {
 	UpdateRecordStatus(id string, status int) error
 	RemoveRecordsByID(concID string) error
 	DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error)
+
+	// GetArchSizesByYears
+	// Without forceReload, the function refuses to perform actual query outside
+	// defined night time.
+	// Returns list of pairs where FIRST item is always YEAR, the SECOND one is COUNT
+	GetArchSizesByYears(forceLoad bool) ([][2]int, error)
 }

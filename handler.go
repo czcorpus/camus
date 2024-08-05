@@ -18,6 +18,7 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cncdb"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -53,17 +54,27 @@ func (v visitedIds) IDList() []string {
 // ------
 
 type Actions struct {
-	BgJob *archiver.ArchKeeper
+	ArchKeeper *archiver.ArchKeeper
 }
 
 func (a *Actions) Overview(ctx *gin.Context) {
 	ans := make(map[string]any)
-	ans["archiver"] = a.BgJob.GetStats()
+	ans["archiver"] = a.ArchKeeper.GetStats()
+	var forceTotalsReload bool
+	if ctx.Query("forceReload") == "1" {
+		forceTotalsReload = true
+	}
+	totals, err := a.ArchKeeper.YearsStats(forceTotalsReload)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	ans["totals"] = totals
 	uniresp.WriteJSONResponse(ctx.Writer, ans)
 }
 
 func (a *Actions) GetRecord(ctx *gin.Context) {
-	rec, err := a.BgJob.LoadRecordsByID(ctx.Param("id"))
+	rec, err := a.ArchKeeper.LoadRecordsByID(ctx.Param("id"))
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
@@ -83,13 +94,13 @@ func (a *Actions) Validate(ctx *gin.Context) {
 			)
 			return
 		}
-		recs, err := a.BgJob.LoadRecordsByID(currID)
+		recs, err := a.ArchKeeper.LoadRecordsByID(currID)
 		if err != nil {
 			uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 			return
 		}
 		queryVariants := make(map[string]int)
-		var reprData archiver.GeneralDataRecord
+		var reprData cncdb.GeneralDataRecord
 		for _, rec := range recs {
 			data, err := rec.FetchData()
 			if err != nil {
@@ -111,24 +122,24 @@ func (a *Actions) Validate(ctx *gin.Context) {
 	uniresp.WriteJSONResponse(
 		ctx.Writer,
 		map[string]any{
-			"message":    "OK",
+			"ok":         true,
 			"visitedIds": visitedIDs.IDList(),
 		},
 	)
 }
 
 func (a *Actions) Fix(ctx *gin.Context) {
-	recs, err := a.BgJob.LoadRecordsByID(ctx.Param("id"))
+	recs, err := a.ArchKeeper.LoadRecordsByID(ctx.Param("id"))
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
 	}
-	fixedRecs := make([]archiver.ArchRecord, len(recs))
+	fixedRecs := make([]cncdb.ArchRecord, len(recs))
 	for i, rec := range recs {
 		rec.Data = brokenConcRec1.ReplaceAllString(rec.Data, "")
 		fixedRecs[i] = rec
 	}
-	newRec, err := a.BgJob.DeduplicateInArchive(fixedRecs, fixedRecs[0])
+	newRec, err := a.ArchKeeper.DeduplicateInArchive(fixedRecs, fixedRecs[0])
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
@@ -137,4 +148,12 @@ func (a *Actions) Fix(ctx *gin.Context) {
 	ans["numInstances"] = len(recs)
 	ans["fixed"] = newRec
 	uniresp.WriteJSONResponse(ctx.Writer, ans)
+}
+
+func (a *Actions) DedupReset(ctx *gin.Context) {
+	if err := a.ArchKeeper.Reset(); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true})
 }

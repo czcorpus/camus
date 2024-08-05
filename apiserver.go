@@ -47,12 +47,13 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.NoMethod(uniresp.NoMethodHandler)
 	engine.NoRoute(uniresp.NotFoundHandler)
 
-	handler := Actions{BgJob: api.arch}
+	handler := Actions{ArchKeeper: api.arch}
 
 	engine.GET("/overview", handler.Overview)
 	engine.GET("/record/:id", handler.GetRecord)
 	engine.GET("/validate/:id", handler.Validate)
 	engine.POST("/fix/:id", handler.Fix)
+	engine.POST("/dedup-reset", handler.DedupReset)
 
 	api.server = &http.Server{
 		Handler:      engine,

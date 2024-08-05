@@ -17,16 +17,15 @@
 package archiver
 
 import (
+	"camus/cncdb"
 	"encoding/json"
-	"fmt"
-	"time"
 )
 
 // -------------------------
 
 type Deduplication struct {
-	NumMerged   int        `json:"numMerged"`
-	FinalRecord ArchRecord `json:"finalRecord"`
+	NumMerged   int              `json:"numMerged"`
+	FinalRecord cncdb.ArchRecord `json:"finalRecord"`
 	error       error
 }
 
@@ -41,73 +40,13 @@ func (dedup Deduplication) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(
 		struct {
-			NumMerged   int        `json:"numMerged"`
-			FinalRecord ArchRecord `json:"finalRecord"`
-			Error       string     `json:"error,omitempty"`
+			NumMerged   int              `json:"numMerged"`
+			FinalRecord cncdb.ArchRecord `json:"finalRecord"`
+			Error       string           `json:"error,omitempty"`
 		}{
 			NumMerged:   dedup.NumMerged,
 			FinalRecord: dedup.FinalRecord,
 			Error:       errMsg,
 		},
 	)
-}
-
-// ----------------------------------
-
-type GeneralDataRecord map[string]any
-
-func (rec GeneralDataRecord) GetPrevID() string {
-	v, ok := rec["prev_id"]
-	if !ok {
-		return ""
-	}
-	typedV, ok := v.(string)
-	if !ok {
-		return ""
-	}
-	return typedV
-}
-
-func (rec GeneralDataRecord) GetCorpora() []string {
-	v, ok := rec["corpora"]
-	if !ok {
-		return []string{}
-	}
-	typedV, ok := v.([]string)
-	if !ok {
-		return []string{}
-	}
-	return typedV
-}
-
-func (rec GeneralDataRecord) GetQuery() []string {
-	v, ok := rec["q"]
-	if !ok {
-		return []string{}
-	}
-	typedV, ok := v.([]string)
-	if !ok {
-		return []string{}
-	}
-	return typedV
-}
-
-// ------------------------
-
-type ArchRecord struct {
-	ID         string
-	Data       string
-	Created    time.Time
-	NumAccess  int
-	LastAccess time.Time
-	Permanent  int
-}
-
-func (rec ArchRecord) FetchData() (GeneralDataRecord, error) {
-	ans := make(GeneralDataRecord)
-	err := json.Unmarshal([]byte(rec.Data), &ans)
-	if err != nil {
-		return GeneralDataRecord{}, fmt.Errorf("failed to fetch ArchRecord data: %w", err)
-	}
-	return ans, nil
 }

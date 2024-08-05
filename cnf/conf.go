@@ -19,7 +19,7 @@ package cnf
 import (
 	"camus/archiver"
 	"camus/cleaner"
-	"camus/util"
+	"camus/cncdb"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -50,10 +50,8 @@ type Conf struct {
 	LogFile                string              `json:"logFile"`
 	LogLevel               logging.LogLevel    `json:"logLevel"`
 	Redis                  *archiver.RedisConf `json:"redis"`
-	MySQL                  *archiver.DBConf    `json:"db"`
-	CheckIntervalSecs      int                 `json:"checkIntervalSecs"`
-	CheckIntervalChunk     int                 `json:"checkIntervalChunk"`
-	DDStateFilePath        string              `json:"ddStateFilePath"`
+	MySQL                  *cncdb.DBConf       `json:"db"`
+	Archiver               *archiver.Conf      `json:"archiver"`
 	Cleaner                cleaner.Conf        `json:"cleaner"`
 	Reporting              hltscl.PgConf       `json:"reporting"`
 }
@@ -105,26 +103,16 @@ func ValidateAndDefaults(conf *Conf) {
 		log.Fatal().Err(err).Msg("invalid time zone")
 	}
 
-	if conf.DDStateFilePath == "" {
-		log.Fatal().Msg("missing path to deduplicator state file (ddStateFilePath)")
-	}
-
-	tmp, err := util.NearestPrime(conf.CheckIntervalSecs)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to tune ops timing")
-	}
-	if tmp != conf.CheckIntervalSecs {
-		log.Warn().
-			Int("oldValue", conf.CheckIntervalSecs).
-			Int("newValue", tmp).
-			Msg("tuned value of checkIntervalSecs so it cannot be easily overlapped by other timers")
-		conf.CheckIntervalSecs = tmp
-	}
 	if err := conf.Redis.ValidateAndDefaults(); err != nil {
 		log.Fatal().Err(err).Msg("invalid Redis configuration")
 	}
 
-	if err := conf.Cleaner.ValidateAndDefaults(conf.CheckIntervalSecs); err != nil {
+	if err := conf.Archiver.ValidateAndDefaults(); err != nil {
+		log.Fatal().Err(err).Msg("invalid archiver configuration")
+	}
+
+	if err := conf.Cleaner.ValidateAndDefaults(conf.Archiver.CheckIntervalSecs); err != nil {
 		log.Fatal().Err(err).Msg("invalid Clean configuration")
 	}
+
 }
