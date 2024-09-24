@@ -22,6 +22,7 @@ import (
 	"camus/cncdb"
 	"camus/cnf"
 	"camus/reporting"
+	"camus/search"
 	"context"
 	"flag"
 	"fmt"
@@ -168,14 +169,17 @@ func main() {
 
 		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
+		fulltext := search.NewService(rdb) // TODO attach to some filesystem location etc.
+
 		as := &apiServer{
-			arch: arch,
-			conf: conf,
+			arch:            arch,
+			conf:            conf,
+			fulltextService: fulltext,
 		}
 
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		services := []service{arch, cln, as, reportingService}
+		services := []service{arch, cln, fulltext, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
 		}

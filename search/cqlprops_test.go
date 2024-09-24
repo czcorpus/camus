@@ -18,6 +18,7 @@
 package search
 
 import (
+	"camus/cncdb"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,12 @@ import (
 
 func TestExtractCQLProps(t *testing.T) {
 	doc := Document{
-		RawQuery: `[word="hi|hello"] [lemma="people" & tag="N.*" & word="p.*"] within <text txtypegroup="FIC: beletrie">`,
+		RawQueries: []cncdb.RawQuery{
+			{
+				Value: `[word="hi|hello"] [lemma="people" & tag="N.*" & word="p.*"] within <text txtypegroup="FIC: beletrie">`,
+				Type:  "advanced",
+			},
+		},
 	}
 	err := ExtractCQLProps(&doc)
 	assert.NoError(t, err)
