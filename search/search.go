@@ -75,11 +75,27 @@ func RecToDoc(arec *cncdb.ArchRecord) (*Document, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
+
+	fmt.Println("SelectedTextTypes: ", rec.GetTextTypes())
+
 	ans := &Document{
 		Created:        arec.Created,
 		UserID:         rec.UserID,
 		QuerySupertype: qstype,
 		RawQueries:     rawq,
 	}
+
+	if err := extractCQLProps(ans); err != nil {
+		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
+	}
+
+	for attr, items := range rec.GetTextTypes() {
+		_, ok := ans.StructAttrs[attr]
+		if !ok {
+			ans.StructAttrs[attr] = make([]string, 0, len(items))
+		}
+		ans.StructAttrs[attr] = append(ans.StructAttrs[attr], items...)
+	}
+
 	return ans, nil
 }

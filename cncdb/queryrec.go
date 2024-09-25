@@ -20,6 +20,8 @@ package cncdb
 import (
 	"errors"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -64,11 +66,10 @@ type RawQuery struct {
 }
 
 type QueryRecord struct {
-	UserID            int                 `json:"user_id"`
-	Q                 []string            `json:"q"`
-	LastopForm        map[string]any      `json:"lastop_form"`
-	SelectedTextTypes map[string][]string `json:"selected_text_types"`
-	Corpora           []string            `json:"corpora"`
+	UserID     int            `json:"user_id"`
+	Q          []string       `json:"q"`
+	LastopForm map[string]any `json:"lastop_form"`
+	Corpora    []string       `json:"corpora"`
 }
 
 func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
@@ -85,6 +86,37 @@ func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
 		return "", fmt.Errorf("failed to get supertype: %w", err)
 	}
 	return st, nil
+}
+
+func (qr *QueryRecord) GetTextTypes() map[string][]string {
+	ans := make(map[string][]string)
+	v, ok := qr.LastopForm["selected_text_types"]
+	if !ok {
+		return ans
+	}
+	vt, ok := v.(map[string]any)
+	if !ok {
+		// TODO at least log this
+		log.Warn().Msg("unexpected structure of selected_text_types, not map[string]any")
+		return ans
+	}
+	for k, values := range vt {
+		tValues, ok := values.([]any)
+		if !ok {
+			log.Warn().Msg("unexpected structure of selected_text_types item, not []any")
+			// TODO at least log this
+			return ans
+		}
+		ans[k] = make([]string, len(tValues))
+		for i, v := range tValues {
+			vt, ok := v.(string)
+			if !ok {
+				log.Warn().Msg("unexpected value in selected_text_types item, not a string")
+			}
+			ans[k][i] = vt
+		}
+	}
+	return ans
 }
 
 func (qr *QueryRecord) getQueryTypes() (map[string]string, error) {

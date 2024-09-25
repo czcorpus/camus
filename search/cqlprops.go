@@ -20,20 +20,19 @@ package search
 import (
 	"fmt"
 
-	"github.com/czcorpus/cnc-gokit/collections"
 	"github.com/czcorpus/cqlizer/cql"
 )
 
-// ExtractCQLProps parses queries stored in `doc` and
+// extractCQLProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func ExtractCQLProps(doc *Document) error {
+func extractCQLProps(doc *Document) error {
 
 	doc.StructAttrs = make(map[string][]string)
 	doc.PosAttrs = make(map[string][]string)
-	structures := collections.NewSet[string]()
+	doc.Structures = make([]string, 0, 5)
 
 	for i, rq := range doc.RawQueries {
 		if rq.Type != "advanced" {
@@ -44,26 +43,26 @@ func ExtractCQLProps(doc *Document) error {
 			return fmt.Errorf("failed to extract CQL properties: %w", err)
 		}
 
-		for _, attval := range q.GetAllAttvals() {
-			fmt.Println("ATTVAL: ", attval)
-			if attval.Structure != "" {
-				structures.Add(attval.Structure)
-				key := fmt.Sprintf("%s.%s", attval.Structure, attval.Name)
+		for _, cqlProp := range q.ExtractProps() {
+			if cqlProp.IsStructAttr() {
+				key := fmt.Sprintf("%s.%s", cqlProp.Structure, cqlProp.Name)
 				_, ok := doc.StructAttrs[key]
 				if !ok {
 					doc.StructAttrs[key] = make([]string, 0, 10)
 				}
-				doc.StructAttrs[key] = append(doc.StructAttrs[key], attval.Value)
+				doc.StructAttrs[key] = append(doc.StructAttrs[key], cqlProp.Value)
 
-			} else {
-				_, ok := doc.PosAttrs[attval.Name]
+			} else if cqlProp.IsStructure() {
+				doc.Structures = append(doc.Structures, cqlProp.Structure)
+
+			} else if cqlProp.IsPosattr() {
+				_, ok := doc.PosAttrs[cqlProp.Name]
 				if !ok {
-					doc.PosAttrs[attval.Name] = make([]string, 0, 10)
+					doc.PosAttrs[cqlProp.Name] = make([]string, 0, 10)
 				}
-				doc.PosAttrs[attval.Name] = append(doc.PosAttrs[attval.Name], attval.Value)
+				doc.PosAttrs[cqlProp.Name] = append(doc.PosAttrs[cqlProp.Name], cqlProp.Value)
 			}
 		}
 	}
-	doc.Structures = structures.ToSlice()
 	return nil
 }

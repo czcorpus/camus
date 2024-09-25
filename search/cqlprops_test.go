@@ -33,7 +33,7 @@ func TestExtractCQLProps(t *testing.T) {
 			},
 		},
 	}
-	err := ExtractCQLProps(&doc)
+	err := extractCQLProps(&doc)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"hi|hello", "p.*"}, doc.PosAttrs["word"])
 	assert.Equal(t, []string{"people"}, doc.PosAttrs["lemma"])

@@ -44,10 +44,6 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	if err = ExtractCQLProps(doc); err != nil {
-		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
-		return
-	}
 	uniresp.WriteJSONResponse(ctx.Writer, doc)
 
 }
