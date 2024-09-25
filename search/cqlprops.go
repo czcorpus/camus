@@ -20,46 +20,49 @@ package search
 import (
 	"fmt"
 
-	"github.com/czcorpus/cnc-gokit/collections"
 	"github.com/czcorpus/cqlizer/cql"
 )
 
-// ExtractCQLProps parses advanced query stored in `doc` and
+// extractCQLProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
-// Note that in case doc is not valid for such use (e.g. simple query type,
-// empty query), the function panics. A doc can be validate using
-// method `IsValidCQLQuery`
-func ExtractCQLProps(doc *Document) error {
-	if !doc.IsValidCQLQuery() {
-		panic("not a valid CQL query")
-	}
+// Note that only "advanced" queries are extracted. In case there
+// are no advanced queries in the document, nothing is changed.
+func extractCQLProps(doc *Document) error {
 
-	q, err := cql.ParseCQL("query", doc.RawQuery)
-	if err != nil {
-		return fmt.Errorf("failed to extract CQL properties: %w", err)
-	}
 	doc.StructAttrs = make(map[string][]string)
 	doc.PosAttrs = make(map[string][]string)
-	structures := collections.NewSet[string]()
-	for _, attval := range q.GetAllAttvals() {
-		if attval.Structure != "" {
-			structures.Add(attval.Structure)
-			key := fmt.Sprintf("%s.%s", attval.Structure, attval.Name)
-			_, ok := doc.StructAttrs[key]
-			if !ok {
-				doc.StructAttrs[key] = make([]string, 0, 10)
-			}
-			doc.StructAttrs[key] = append(doc.StructAttrs[key], attval.Value)
+	doc.Structures = make([]string, 0, 5)
 
-		} else {
-			_, ok := doc.PosAttrs[attval.Name]
-			if !ok {
-				doc.PosAttrs[attval.Name] = make([]string, 0, 10)
+	for i, rq := range doc.RawQueries {
+		if rq.Type != "advanced" {
+			continue
+		}
+		q, err := cql.ParseCQL(fmt.Sprintf("query-%d", i), rq.Value)
+		if err != nil {
+			return fmt.Errorf("failed to extract CQL properties: %w", err)
+		}
+
+		for _, cqlProp := range q.ExtractProps() {
+			if cqlProp.IsStructAttr() {
+				key := fmt.Sprintf("%s.%s", cqlProp.Structure, cqlProp.Name)
+				_, ok := doc.StructAttrs[key]
+				if !ok {
+					doc.StructAttrs[key] = make([]string, 0, 10)
+				}
+				doc.StructAttrs[key] = append(doc.StructAttrs[key], cqlProp.Value)
+
+			} else if cqlProp.IsStructure() {
+				doc.Structures = append(doc.Structures, cqlProp.Structure)
+
+			} else if cqlProp.IsPosattr() {
+				_, ok := doc.PosAttrs[cqlProp.Name]
+				if !ok {
+					doc.PosAttrs[cqlProp.Name] = make([]string, 0, 10)
+				}
+				doc.PosAttrs[cqlProp.Name] = append(doc.PosAttrs[cqlProp.Name], cqlProp.Value)
 			}
-			doc.PosAttrs[attval.Name] = append(doc.PosAttrs[attval.Name], attval.Value)
 		}
 	}
-	doc.Structures = structures.ToSlice()
 	return nil
 }

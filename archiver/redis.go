@@ -117,6 +117,9 @@ func (rd *RedisAdapter) mkKey(id string) string {
 
 func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
 	ans := rd.redis.Get(rd.ctx, rd.mkKey(id))
+	if ans.Err() == redis.Nil {
+		return cncdb.ArchRecord{}, cncdb.ErrRecordNotFound
+	}
 	if ans.Err() != nil {
 		return cncdb.ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
 	}

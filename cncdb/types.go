@@ -18,8 +18,13 @@ package cncdb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	ErrRecordNotFound = errors.New("record not found")
 )
 
 type GeneralDataRecord map[string]any

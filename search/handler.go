@@ -18,42 +18,36 @@
 package search
 
 import (
-	"camus/archiver"
 	"camus/cncdb"
-	"context"
+	"net/http"
 
-	"github.com/blevesearch/bleve/v2"
-	"github.com/rs/zerolog/log"
+	"github.com/czcorpus/cnc-gokit/uniresp"
+	"github.com/gin-gonic/gin"
 )
 
-type Service struct {
-	index *bleve.Index
-	redis *archiver.RedisAdapter
+type Actions struct {
+	service *Service
 }
 
-func (service *Service) Start(ctx context.Context) {
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				log.Info().Msg("about to close fulltext Service")
-				return
-			}
-		}
-	}()
-}
-
-func (service *Service) Stop(ctx context.Context) error {
-	log.Warn().Msg("shutting down fulltext search service")
-	return nil
-}
-
-func (service *Service) GetRecord(ident string) (cncdb.ArchRecord, error) {
-	return service.redis.GetConcRecord(ident)
-}
-
-func NewService(redis *archiver.RedisAdapter) *Service {
-	return &Service{
-		redis: redis,
+func (a *Actions) RecordToDoc(ctx *gin.Context) {
+	rec, err := a.service.GetRecord(ctx.Query("id"))
+	if err == cncdb.ErrRecordNotFound {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusNotFound)
+		return
 	}
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	doc, err := RecToDoc(&rec)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, doc)
+
+}
+
+func NewActions(service *Service) *Actions {
+	return &Actions{service: service}
 }

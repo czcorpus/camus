@@ -19,6 +19,7 @@ package main
 import (
 	"camus/archiver"
 	"camus/cnf"
+	"camus/search"
 	"context"
 	"fmt"
 	"net/http"
@@ -31,9 +32,10 @@ import (
 )
 
 type apiServer struct {
-	server *http.Server
-	conf   *cnf.Conf
-	arch   *archiver.ArchKeeper
+	server          *http.Server
+	conf            *cnf.Conf
+	arch            *archiver.ArchKeeper
+	fulltextService *search.Service
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -47,13 +49,17 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.NoMethod(uniresp.NoMethodHandler)
 	engine.NoRoute(uniresp.NotFoundHandler)
 
-	handler := Actions{ArchKeeper: api.arch}
+	archHandler := Actions{ArchKeeper: api.arch}
 
-	engine.GET("/overview", handler.Overview)
-	engine.GET("/record/:id", handler.GetRecord)
-	engine.GET("/validate/:id", handler.Validate)
-	engine.POST("/fix/:id", handler.Fix)
-	engine.POST("/dedup-reset", handler.DedupReset)
+	engine.GET("/overview", archHandler.Overview)
+	engine.GET("/record/:id", archHandler.GetRecord)
+	engine.GET("/validate/:id", archHandler.Validate)
+	engine.POST("/fix/:id", archHandler.Fix)
+	engine.POST("/dedup-reset", archHandler.DedupReset)
+
+	fulltextHandler := search.NewActions(api.fulltextService)
+
+	engine.GET("/search/rec2doc", fulltextHandler.RecordToDoc)
 
 	api.server = &http.Server{
 		Handler:      engine,
