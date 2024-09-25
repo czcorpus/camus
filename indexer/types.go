@@ -16,38 +16,30 @@
 
 package indexer
 
-import (
-	"github.com/blevesearch/bleve/v2"
-)
+import "time"
 
-type Indexer struct {
-	conf     *Conf
-	bleveIdx bleve.Index
-}
+type BleveDoc struct {
+	ID string
 
-func (idx *Indexer) Index(doc *BleveDoc) error {
-	return idx.bleveIdx.Index(doc.ID, doc)
-}
+	Created time.Time
 
-func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
-	query := bleve.NewMatchQuery(q)
-	search := bleve.NewSearchRequest(query)
-	return idx.bleveIdx.Search(search)
-}
+	UserID int
 
-func NewIndexer(
-	conf *Conf,
-) (*Indexer, error) {
-	bleveIdx, err := bleve.Open(conf.IndexFilePath)
-	if err != nil {
-		mapping := bleve.NewIndexMapping()
-		bleveIdx, err = bleve.New(conf.IndexFilePath, mapping)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &Indexer{
-		conf:     conf,
-		bleveIdx: bleveIdx,
-	}, nil
+	IsSimpleQuery bool
+
+	Corpora string
+
+	Subcorpus string
+
+	RawQuery string
+
+	Structures string
+
+	StructAttrNames string
+
+	StructAttrValues string
+
+	PosAttrNames string
+
+	PosAttrValues string
 }
