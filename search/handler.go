@@ -48,6 +48,23 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 
 }
 
+type queryHistRec struct {
+	QueryID string `json:"query_id"`
+	UserID  int    `json:"user_id"`
+	Created int    `json:"created"`
+}
+
+type queryHistRecList []queryHistRec
+
+func (a *Actions) RemoveFromIndex(ctx *gin.Context) {
+	var recList queryHistRecList
+	if err := ctx.ShouldBindJSON(&recList); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true, "records": recList})
+}
+
 func NewActions(service *Service) *Actions {
 	return &Actions{service: service}
 }
