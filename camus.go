@@ -21,6 +21,7 @@ import (
 	"camus/cleaner"
 	"camus/cncdb"
 	"camus/cnf"
+	"camus/indexer"
 	"camus/reporting"
 	"camus/search"
 	"context"
@@ -171,10 +172,18 @@ func main() {
 
 		fulltext := search.NewService(rdb) // TODO attach to some filesystem location etc.
 
+		idx, err := indexer.NewIndexer(conf.Indexer, cleanerDbOps)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to initialize index")
+			os.Exit(1)
+			return
+		}
+
 		as := &apiServer{
 			arch:            arch,
 			conf:            conf,
 			fulltextService: fulltext,
+			idx:             idx,
 		}
 
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

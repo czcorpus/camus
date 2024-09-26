@@ -17,16 +17,68 @@
 package indexer
 
 import (
+	"camus/cncdb"
+	"camus/search"
+	"strings"
+
 	"github.com/blevesearch/bleve/v2"
+	"github.com/rs/zerolog/log"
 )
 
 type Indexer struct {
 	conf     *Conf
+	db       cncdb.IMySQLOps
 	bleveIdx bleve.Index
 }
 
-func (idx *Indexer) Index(doc *BleveDoc) error {
-	return idx.bleveIdx.Index(doc.ID, doc)
+func (idx *Indexer) IndexRecords() error {
+	results, err := idx.db.LoadRecentNRecords(1000)
+	if err != nil {
+		return err
+	}
+	log.Debug().Any("doc", results).Send()
+	for _, rec := range results {
+		doc, err := search.RecToDoc(&rec)
+		if err != nil {
+			return err
+		}
+		log.Debug().Any("doc", doc).Send()
+
+		posAttrNames := make([]string, 0, 5)
+		posAttrValues := make([]string, 0, 5)
+		for name, values := range doc.PosAttrs {
+			posAttrNames = append(posAttrNames, name)
+			posAttrValues = append(posAttrNames, values...)
+		}
+
+		structAttrNames := make([]string, 0, 5)
+		structAttrValues := make([]string, 0, 5)
+		for name, values := range doc.StructAttrs {
+			structAttrNames = append(structAttrNames, name)
+			structAttrValues = append(structAttrValues, values...)
+		}
+		bDoc := BleveDoc{
+			ID:               rec.ID,
+			Created:          rec.Created,
+			UserID:           doc.UserID,
+			Corpora:          strings.Join(doc.Corpora, ","),
+			Subcorpus:        doc.Subcorpus,
+			Structures:       strings.Join(doc.Structures, ","),
+			StructAttrNames:  strings.Join(structAttrNames, ","),
+			StructAttrValues: strings.Join(structAttrValues, ","),
+			PosAttrNames:     strings.Join(posAttrNames, ","),
+			PosAttrValues:    strings.Join(posAttrValues, ","),
+		}
+		err = idx.bleveIdx.Index(bDoc.ID, bDoc)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (idx *Indexer) Count() (uint64, error) {
+	return idx.bleveIdx.DocCount()
 }
 
 func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
@@ -35,9 +87,7 @@ func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
 	return idx.bleveIdx.Search(search)
 }
 
-func NewIndexer(
-	conf *Conf,
-) (*Indexer, error) {
+func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexFilePath)
 	if err != nil {
 		mapping := bleve.NewIndexMapping()
@@ -48,6 +98,7 @@ func NewIndexer(
 	}
 	return &Indexer{
 		conf:     conf,
+		db:       db,
 		bleveIdx: bleveIdx,
 	}, nil
 }
