@@ -58,6 +58,9 @@ type Document struct {
 	PosAttrs map[string][]string `json:"posAttrs"`
 }
 
+// IsValidCQLQuery tests for indexability of a query at position idx
+// (when considering a possible query to aligned corpora; for single-corpus
+// queries, idx==0 is the only option)
 func (doc *Document) IsValidCQLQuery(idx int) bool {
 	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
 }
