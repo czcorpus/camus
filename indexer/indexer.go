@@ -18,9 +18,11 @@ package indexer
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,12 +63,15 @@ func (idx *Indexer) IndexRecords() error {
 			UserID:           doc.UserID,
 			Corpora:          strings.Join(doc.Corpora, ","),
 			Subcorpus:        doc.Subcorpus,
+			RawQuery:         doc.GetRawQueriesAsString(),
 			Structures:       strings.Join(doc.Structures, ","),
 			StructAttrNames:  strings.Join(structAttrNames, ","),
 			StructAttrValues: strings.Join(structAttrValues, ","),
 			PosAttrNames:     strings.Join(posAttrNames, ","),
 			PosAttrValues:    strings.Join(posAttrValues, ","),
 		}
+		fmt.Println("------------------- INDEXING _-------------------")
+		spew.Dump(bDoc)
 		err = idx.bleveIdx.Index(bDoc.ID, bDoc)
 		if err != nil {
 			return err
@@ -88,7 +93,7 @@ func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
 func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexFilePath)
 	if err != nil {
-		mapping := bleve.NewIndexMapping()
+		mapping := CreateMapping()
 		bleveIdx, err = bleve.New(conf.IndexFilePath, mapping)
 		if err != nil {
 			return nil, err

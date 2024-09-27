@@ -21,6 +21,7 @@ import (
 	"camus/cncdb"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -56,6 +57,14 @@ type Document struct {
 	// PosAttrs contains all the positional attributes and their values
 	// in the query.
 	PosAttrs map[string][]string `json:"posAttrs"`
+}
+
+func (doc *Document) GetRawQueriesAsString() string {
+	var ans strings.Builder
+	for _, v := range doc.RawQueries {
+		ans.WriteString(" " + v.Value)
+	}
+	return ans.String()
 }
 
 // IsValidCQLQuery tests for indexability of a query at position idx

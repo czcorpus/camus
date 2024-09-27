@@ -16,7 +16,14 @@
 
 package indexer
 
-import "time"
+import (
+	"time"
+
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/analysis/token/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
+	"github.com/blevesearch/bleve/v2/mapping"
+)
 
 type BleveDoc struct {
 	ID string
@@ -42,4 +49,26 @@ type BleveDoc struct {
 	PosAttrNames string
 
 	PosAttrValues string
+}
+
+func (bdoc BleveDoc) Type() string {
+	return "query"
+}
+
+func CreateMapping() mapping.IndexMapping {
+
+	exactValMapping := bleve.NewTextFieldMapping()
+	exactValMapping.Analyzer = keyword.Name
+
+	multiValMapping := bleve.NewTextFieldMapping()
+	multiValMapping.Analyzer = whitespace.Name
+
+	bdocMapping := bleve.NewDocumentMapping()
+	bdocMapping.AddFieldMappingsAt("ID", exactValMapping)
+	bdocMapping.AddFieldMappingsAt("UserID", exactValMapping)
+	bdocMapping.AddFieldMappingsAt("RawQuery", multiValMapping)
+
+	indexMapping := bleve.NewIndexMapping()
+	indexMapping.AddDocumentMapping("query", bdocMapping)
+	return indexMapping
 }
