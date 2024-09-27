@@ -35,13 +35,12 @@ func (idx *Indexer) IndexRecords() error {
 	if err != nil {
 		return err
 	}
-	log.Debug().Any("doc", results).Send()
 	for _, rec := range results {
 		doc, err := RecToDoc(&rec)
 		if err != nil {
-			return err
+			log.Debug().Err(err).Any("rec", rec).Send()
+			continue
 		}
-		log.Debug().Any("doc", doc).Send()
 
 		posAttrNames := make([]string, 0, 5)
 		posAttrValues := make([]string, 0, 5)
