@@ -26,29 +26,29 @@ import (
 )
 
 type BleveDoc struct {
-	ID string
+	ID string `json:"id"`
 
-	Created time.Time
+	Created time.Time `json:"created"`
 
-	UserID int
+	UserID int `json:"user_id"`
 
-	IsSimpleQuery bool
+	IsSimpleQuery bool `json:"is_simple_query"`
 
-	Corpora string
+	Corpora string `json:"corpora"`
 
-	Subcorpus string
+	Subcorpus string `json:"subcorpus"`
 
-	RawQuery string
+	RawQuery string `json:"raw_query"`
 
-	Structures string
+	Structures string `json:"structures"`
 
-	StructAttrNames string
+	StructAttrNames string `json:"struct_attr_names"`
 
-	StructAttrValues string
+	StructAttrValues string `json:"struct_attr_values"`
 
-	PosAttrNames string
+	PosAttrNames string `json:"pos_attr_names"`
 
-	PosAttrValues string
+	PosAttrValues string `json:"pos_attr_values"`
 }
 
 func (bdoc BleveDoc) Type() string {
@@ -64,9 +64,9 @@ func CreateMapping() mapping.IndexMapping {
 	multiValMapping.Analyzer = whitespace.Name
 
 	bdocMapping := bleve.NewDocumentMapping()
-	bdocMapping.AddFieldMappingsAt("ID", exactValMapping)
-	bdocMapping.AddFieldMappingsAt("UserID", exactValMapping)
-	bdocMapping.AddFieldMappingsAt("RawQuery", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("id", exactValMapping)
+	bdocMapping.AddFieldMappingsAt("user_id", exactValMapping)
+	bdocMapping.AddFieldMappingsAt("raw_query", multiValMapping)
 
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.AddDocumentMapping("query", bdocMapping)

@@ -18,11 +18,9 @@ package indexer
 
 import (
 	"camus/cncdb"
-	"fmt"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 )
 
@@ -70,8 +68,6 @@ func (idx *Indexer) IndexRecords() error {
 			PosAttrNames:     strings.Join(posAttrNames, ","),
 			PosAttrValues:    strings.Join(posAttrValues, ","),
 		}
-		fmt.Println("------------------- INDEXING _-------------------")
-		spew.Dump(bDoc)
 		err = idx.bleveIdx.Index(bDoc.ID, bDoc)
 		if err != nil {
 			return err
