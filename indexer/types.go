@@ -19,8 +19,6 @@ package indexer
 import (
 	"time"
 
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
-
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/mapping"
@@ -31,7 +29,7 @@ type BleveDoc struct {
 
 	Created time.Time `json:"created"`
 
-	UserID int `json:"user_id"`
+	UserID string `json:"user_id"`
 
 	IsSimpleQuery bool `json:"is_simple_query"`
 
@@ -58,18 +56,21 @@ func (bdoc BleveDoc) Type() string {
 
 func CreateMapping() mapping.IndexMapping {
 
-	exactValMapping := bleve.NewTextFieldMapping()
-	exactValMapping.Analyzer = keyword.Name
+	exactStringMapping := bleve.NewKeywordFieldMapping()
 
 	multiValMapping := bleve.NewTextFieldMapping()
 	multiValMapping.Analyzer = simple.Name
 
+	dtMapping := bleve.NewDateTimeFieldMapping()
+
 	bdocMapping := bleve.NewDocumentMapping()
-	bdocMapping.AddFieldMappingsAt("id", exactValMapping)
-	bdocMapping.AddFieldMappingsAt("user_id", exactValMapping)
+	bdocMapping.AddFieldMappingsAt("id", exactStringMapping)
+	bdocMapping.AddFieldMappingsAt("user_id", exactStringMapping)
+	bdocMapping.AddFieldMappingsAt("created", dtMapping)
 	bdocMapping.AddFieldMappingsAt("raw_query", multiValMapping)
 
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.AddDocumentMapping("query", bdocMapping)
+	indexMapping.DefaultAnalyzer = simple.Name
 	return indexMapping
 }

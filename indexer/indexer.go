@@ -19,6 +19,7 @@ package indexer
 import (
 	"camus/cncdb"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
@@ -59,7 +60,7 @@ func (idx *Indexer) IndexRecords() error {
 		bDoc := BleveDoc{
 			ID:               rec.ID,
 			Created:          rec.Created,
-			UserID:           doc.UserID,
+			UserID:           strconv.Itoa(doc.UserID),
 			Corpora:          strings.Join(doc.Corpora, ","),
 			Subcorpus:        doc.Subcorpus,
 			RawQuery:         doc.GetRawQueriesAsString(),
@@ -82,8 +83,10 @@ func (idx *Indexer) Count() (uint64, error) {
 }
 
 func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
-	query := bleve.NewMatchQuery(q)
+	query := bleve.NewQueryStringQuery(q)
 	search := bleve.NewSearchRequest(query)
+	search.Fields = []string{"*"}
+	search.Size = 20 // TODO !!!
 	return idx.bleveIdx.Search(search)
 }
 
