@@ -24,6 +24,12 @@ import (
 	"time"
 )
 
+type QueryHistoryIdent struct {
+	QueryID string `json:"query_id"`
+	UserID  int    `json:"user_id"`
+	Created int    `json:"created"`
+}
+
 // Document is a KonText query representation intended for
 // fulltext indexing and search
 type Document struct {
@@ -58,6 +64,9 @@ type Document struct {
 	PosAttrs map[string][]string `json:"posAttrs"`
 }
 
+// IsValidCQLQuery tests for indexability of a query at position idx
+// (when considering a possible query to aligned corpora; for single-corpus
+// queries, idx==0 is the only option)
 func (doc *Document) IsValidCQLQuery(idx int) bool {
 	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
 }

@@ -20,6 +20,7 @@ import (
 	"camus/archiver"
 	"camus/cleaner"
 	"camus/cncdb"
+	"camus/search"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -54,6 +55,7 @@ type Conf struct {
 	Archiver               *archiver.Conf      `json:"archiver"`
 	Cleaner                cleaner.Conf        `json:"cleaner"`
 	Reporting              hltscl.PgConf       `json:"reporting"`
+	QuerySearch            *search.Conf        `json:"querySearch"`
 }
 
 func (conf *Conf) TimezoneLocation() *time.Location {

@@ -19,8 +19,12 @@ package search
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"net/http"
 
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
 )
@@ -46,6 +50,22 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, doc)
 
+}
+
+func (a *Actions) RemoveFromIndex(ctx *gin.Context) {
+	a.service.TriggerNextRmItem()
+	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true})
+}
+
+func (a *Actions) BleveTest(ctx *gin.Context) {
+	indexMapping := bleve.NewIndexMapping()
+	englishTextFieldMapping := bleve.NewTextFieldMapping()
+	englishTextFieldMapping.Analyzer = en.AnalyzerName
+	fmt.Println("indexMapping: ", indexMapping)
+
+	// a generic reusable mapping for keyword text
+	keywordFieldMapping := bleve.NewTextFieldMapping()
+	keywordFieldMapping.Analyzer = keyword.Name
 }
 
 func NewActions(service *Service) *Actions {

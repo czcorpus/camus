@@ -169,7 +169,7 @@ func main() {
 
 		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
-		fulltext := search.NewService(rdb) // TODO attach to some filesystem location etc.
+		fulltext := search.NewService(conf.QuerySearch, rdb) // TODO attach to some filesystem location etc.
 
 		as := &apiServer{
 			arch:            arch,

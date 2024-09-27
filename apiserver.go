@@ -60,6 +60,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	fulltextHandler := search.NewActions(api.fulltextService)
 
 	engine.GET("/search/rec2doc", fulltextHandler.RecordToDoc)
+	engine.DELETE("/search/records", fulltextHandler.RemoveFromIndex)
 
 	api.server = &http.Server{
 		Handler:      engine,
