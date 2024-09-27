@@ -1,4 +1,3 @@
-// Copyright 2024 Tomas Machalek <tomas.machalek@gmail.com>
 // Copyright 2024 Martin Zimandl <martin.zimandl@gmail.com>
 // Copyright 2024 Institute of the Czech National Corpus,
 //                Faculty of Arts, Charles University
@@ -15,10 +14,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package search
+package indexer
 
-type QueryHistoryIdent struct {
-	QueryID string `json:"query_id"`
-	UserID  int    `json:"user_id"`
-	Created int    `json:"created"`
+import "time"
+
+type BleveDoc struct {
+	ID string
+
+	Created time.Time
+
+	UserID int
+
+	IsSimpleQuery bool
+
+	Corpora string
+
+	Subcorpus string
+
+	RawQuery string
+
+	Structures string
+
+	StructAttrNames string
+
+	StructAttrValues string
+
+	PosAttrNames string
+
+	PosAttrValues string
 }

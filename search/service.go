@@ -20,6 +20,7 @@ package search
 import (
 	"camus/archiver"
 	"camus/cncdb"
+	"camus/indexer"
 	"context"
 	"encoding/json"
 
@@ -70,7 +71,7 @@ func (service *Service) TriggerNextRmItem() {
 }
 
 func NewService(
-	conf *Conf,
+	conf *indexer.Conf,
 	redis *archiver.RedisAdapter,
 ) *Service {
 	return &Service{

@@ -19,6 +19,7 @@ package main
 import (
 	"camus/archiver"
 	"camus/cnf"
+	"camus/indexer"
 	"camus/search"
 	"context"
 	"fmt"
@@ -36,6 +37,7 @@ type apiServer struct {
 	conf            *cnf.Conf
 	arch            *archiver.ArchKeeper
 	fulltextService *search.Service
+	idx             *indexer.Indexer
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -61,6 +63,10 @@ func (api *apiServer) Start(ctx context.Context) {
 
 	engine.GET("/search/rec2doc", fulltextHandler.RecordToDoc)
 	engine.DELETE("/search/records", fulltextHandler.RemoveFromIndex)
+
+	indexerHandler := indexer.NewActions(api.idx)
+	engine.GET("/indexer/build", indexerHandler.IndexRecords)
+	engine.GET("/indexer/search", indexerHandler.Search)
 
 	api.server = &http.Server{
 		Handler:      engine,

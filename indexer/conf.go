@@ -1,4 +1,3 @@
-// Copyright 2024 Tomas Machalek <tomas.machalek@gmail.com>
 // Copyright 2024 Martin Zimandl <martin.zimandl@gmail.com>
 // Copyright 2024 Institute of the Czech National Corpus,
 //                Faculty of Arts, Charles University
@@ -15,10 +14,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package search
+package indexer
 
-type QueryHistoryIdent struct {
-	QueryID string `json:"query_id"`
-	UserID  int    `json:"user_id"`
-	Created int    `json:"created"`
+import (
+	"fmt"
+)
+
+type Conf struct {
+	IndexFilePath    string `json:"indexFilePath"`
+	DocRemoveChannel string `json:"docRemoveChannel"`
+}
+
+func (conf *Conf) ValidateAndDefaults() error {
+	if conf == nil {
+		return fmt.Errorf("missing `indexer` section")
+	}
+	if conf.IndexFilePath == "" {
+		return fmt.Errorf("missing path to index file (indexFilePath)")
+	}
+	return nil
 }

@@ -19,6 +19,7 @@ package search
 
 import (
 	"camus/cncdb"
+	"camus/indexer"
 	"fmt"
 	"net/http"
 
@@ -43,7 +44,7 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	doc, err := RecToDoc(&rec)
+	doc, err := indexer.RecToDoc(&rec)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
