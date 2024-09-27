@@ -55,6 +55,10 @@ func (rd *RedisAdapter) Get(k string) (string, error) {
 	return cmd.Val(), nil
 }
 
+func (rd *RedisAdapter) TriggerChan(chname, value string) error {
+	return rd.redis.Publish(rd.ctx, chname, value).Err()
+}
+
 func (rd *RedisAdapter) Set(k string, v any) error {
 	cmd := rd.redis.Set(rd.ctx, k, v, 0)
 	if cmd.Err() != nil {
@@ -63,7 +67,24 @@ func (rd *RedisAdapter) Set(k string, v any) error {
 	return nil
 }
 
-func (rd *RedisAdapter) NextNItems(n int64) ([]queueRecord, error) {
+// ChannelSubscribe subscribe to a Redis channel with a specified name.
+func (rd *RedisAdapter) ChannelSubscribe(name string) <-chan *redis.Message {
+	sub := rd.redis.Subscribe(rd.ctx, name)
+	return sub.Channel()
+}
+
+// NextQueueItem fetches an item from the beginning of a Redis list
+// (i.e. LPOP is used in the background and RPUSH is expected to be
+// used to add new items on the other side).
+func (rd *RedisAdapter) NextQueueItem(queue string) (string, error) {
+	lpopCmd := rd.redis.LPop(rd.ctx, queue)
+	if lpopCmd.Err() != nil {
+		return "", lpopCmd.Err()
+	}
+	return lpopCmd.Val(), nil
+}
+
+func (rd *RedisAdapter) NextNArchItems(n int64) ([]queueRecord, error) {
 	ans := make([]queueRecord, 0, n)
 	ppl := rd.redis.Pipeline()
 	lrangeCmd := ppl.LRange(rd.ctx, rd.conf.QueueKey, -n, -1)

@@ -24,6 +24,12 @@ import (
 	"time"
 )
 
+type QueryHistoryIdent struct {
+	QueryID string `json:"query_id"`
+	UserID  int    `json:"user_id"`
+	Created int    `json:"created"`
+}
+
 // Document is a KonText query representation intended for
 // fulltext indexing and search
 type Document struct {
