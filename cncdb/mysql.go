@@ -77,7 +77,7 @@ func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
 	// able to determine it from `order by created DESC limit X` ?)
-	helperLimit := time.Now().In(ops.tz).Add(180 * 24 * time.Hour)
+	helperLimit := time.Now().In(ops.tz).Add(-180 * 24 * time.Hour)
 	if num > maxRecentRecords {
 		panic(fmt.Sprintf("cannot load more than %d records at a time", maxRecentRecords))
 	}
