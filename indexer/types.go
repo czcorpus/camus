@@ -19,9 +19,10 @@ package indexer
 import (
 	"time"
 
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+
 	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/analysis/token/keyword"
-	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
 	"github.com/blevesearch/bleve/v2/mapping"
 )
 
@@ -61,7 +62,7 @@ func CreateMapping() mapping.IndexMapping {
 	exactValMapping.Analyzer = keyword.Name
 
 	multiValMapping := bleve.NewTextFieldMapping()
-	multiValMapping.Analyzer = whitespace.Name
+	multiValMapping.Analyzer = simple.Name
 
 	bdocMapping := bleve.NewDocumentMapping()
 	bdocMapping.AddFieldMappingsAt("id", exactValMapping)

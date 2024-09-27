@@ -18,6 +18,7 @@ package indexer
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
@@ -88,11 +89,11 @@ func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
 
 func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexFilePath)
-	if err != nil {
+	if err == bleve.ErrorIndexMetaMissing {
 		mapping := CreateMapping()
 		bleveIdx, err = bleve.New(conf.IndexFilePath, mapping)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create new index: %w", err)
 		}
 	}
 	return &Indexer{
