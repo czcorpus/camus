@@ -19,8 +19,13 @@ package search
 
 import (
 	"camus/cncdb"
+	"camus/indexer"
+	"fmt"
 	"net/http"
 
+	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/keyword"
+	"github.com/blevesearch/bleve/v2/analysis/lang/en"
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
 )
@@ -39,7 +44,7 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	doc, err := RecToDoc(&rec)
+	doc, err := indexer.RecToDoc(&rec)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
@@ -48,21 +53,20 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 
 }
 
-type queryHistRec struct {
-	QueryID string `json:"query_id"`
-	UserID  int    `json:"user_id"`
-	Created int    `json:"created"`
+func (a *Actions) RemoveFromIndex(ctx *gin.Context) {
+	a.service.TriggerNextRmItem()
+	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true})
 }
 
-type queryHistRecList []queryHistRec
+func (a *Actions) BleveTest(ctx *gin.Context) {
+	indexMapping := bleve.NewIndexMapping()
+	englishTextFieldMapping := bleve.NewTextFieldMapping()
+	englishTextFieldMapping.Analyzer = en.AnalyzerName
+	fmt.Println("indexMapping: ", indexMapping)
 
-func (a *Actions) RemoveFromIndex(ctx *gin.Context) {
-	var recList queryHistRecList
-	if err := ctx.ShouldBindJSON(&recList); err != nil {
-		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
-		return
-	}
-	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true, "records": recList})
+	// a generic reusable mapping for keyword text
+	keywordFieldMapping := bleve.NewTextFieldMapping()
+	keywordFieldMapping.Analyzer = keyword.Name
 }
 
 func NewActions(service *Service) *Actions {

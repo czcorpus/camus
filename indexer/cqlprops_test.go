@@ -15,10 +15,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package search
+package indexer
 
-type QueryHistoryIdent struct {
-	QueryID string `json:"query_id"`
-	UserID  int    `json:"user_id"`
-	Created int    `json:"created"`
+import (
+	"camus/cncdb"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestExtractCQLProps(t *testing.T) {
+	doc := Document{
+		RawQueries: []cncdb.RawQuery{
+			{
+				Value: `[word="hi|hello"] [lemma="people" & tag="N.*" & word="p.*"] within <text txtypegroup="FIC: beletrie">`,
+				Type:  "advanced",
+			},
+		},
+	}
+	err := extractCQLProps(&doc)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"hi|hello", "p.*"}, doc.PosAttrs["word"])
+	assert.Equal(t, []string{"people"}, doc.PosAttrs["lemma"])
+	assert.Equal(t, []string{"N.*"}, doc.PosAttrs["tag"])
+	assert.Equal(t, []string{"text"}, doc.Structures)
+	assert.Equal(t, []string{"FIC: beletrie"}, doc.StructAttrs["text.txtypegroup"])
+
 }

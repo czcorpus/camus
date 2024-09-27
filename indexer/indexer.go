@@ -18,7 +18,6 @@ package indexer
 
 import (
 	"camus/cncdb"
-	"camus/search"
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
@@ -38,7 +37,7 @@ func (idx *Indexer) IndexRecords() error {
 	}
 	log.Debug().Any("doc", results).Send()
 	for _, rec := range results {
-		doc, err := search.RecToDoc(&rec)
+		doc, err := RecToDoc(&rec)
 		if err != nil {
 			return err
 		}

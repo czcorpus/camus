@@ -21,7 +21,8 @@ import (
 )
 
 type Conf struct {
-	IndexFilePath string `json:"indexFilePath"`
+	IndexFilePath    string `json:"indexFilePath"`
+	DocRemoveChannel string `json:"docRemoveChannel"`
 }
 
 func (conf *Conf) ValidateAndDefaults() error {

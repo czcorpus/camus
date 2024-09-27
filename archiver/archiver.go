@@ -162,7 +162,7 @@ func (job *ArchKeeper) handleExplicitReq(
 }
 
 func (job *ArchKeeper) performCheck() error {
-	items, err := job.redis.NextNItems(int64(job.conf.CheckIntervalChunk))
+	items, err := job.redis.NextNArchItems(int64(job.conf.CheckIntervalChunk))
 	log.Debug().
 		AnErr("error", err).
 		Int("itemsToProcess", len(items)).

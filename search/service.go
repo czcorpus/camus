@@ -20,15 +20,20 @@ package search
 import (
 	"camus/archiver"
 	"camus/cncdb"
+	"camus/indexer"
 	"context"
+	"encoding/json"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
 type Service struct {
-	index *bleve.Index
-	redis *archiver.RedisAdapter
+	index      *bleve.Index
+	redis      *archiver.RedisAdapter
+	rmChanName string
+	rmChan     <-chan *redis.Message
 }
 
 func (service *Service) Start(ctx context.Context) {
@@ -38,6 +43,15 @@ func (service *Service) Start(ctx context.Context) {
 			case <-ctx.Done():
 				log.Info().Msg("about to close fulltext Service")
 				return
+			case msg := <-service.rmChan:
+				var item QueryHistoryIdent
+				if err := json.Unmarshal([]byte(msg.Payload), &item); err != nil {
+					log.Error().Err(err).Msg("failed to unmarshal next fulltext remove item")
+					continue
+				}
+				log.Debug().Any("item", item).Msg("about to remove item from Bleve index")
+				// TODO use Bleve here
+
 			}
 		}
 	}()
@@ -52,8 +66,17 @@ func (service *Service) GetRecord(ident string) (cncdb.ArchRecord, error) {
 	return service.redis.GetConcRecord(ident)
 }
 
-func NewService(redis *archiver.RedisAdapter) *Service {
+func (service *Service) TriggerNextRmItem() {
+	service.redis.TriggerChan(service.rmChanName, "next")
+}
+
+func NewService(
+	conf *indexer.Conf,
+	redis *archiver.RedisAdapter,
+) *Service {
 	return &Service{
-		redis: redis,
+		redis:      redis,
+		rmChan:     redis.ChannelSubscribe(conf.DocRemoveChannel),
+		rmChanName: conf.DocRemoveChannel,
 	}
 }
