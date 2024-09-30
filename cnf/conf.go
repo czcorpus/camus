@@ -117,4 +117,7 @@ func ValidateAndDefaults(conf *Conf) {
 		log.Fatal().Err(err).Msg("invalid Clean configuration")
 	}
 
+	if err := conf.Indexer.ValidateAndDefaults(); err != nil {
+		log.Fatal().Err(err).Msg("invalid indexer configuration")
+	}
 }
