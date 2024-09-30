@@ -18,10 +18,12 @@ package indexer
 
 import (
 	"fmt"
+
+	"github.com/czcorpus/cnc-gokit/fs"
 )
 
 type Conf struct {
-	IndexFilePath    string `json:"indexFilePath"`
+	IndexDirPath     string `json:"indexDirPath"`
 	DocRemoveChannel string `json:"docRemoveChannel"`
 }
 
@@ -29,8 +31,14 @@ func (conf *Conf) ValidateAndDefaults() error {
 	if conf == nil {
 		return fmt.Errorf("missing `indexer` section")
 	}
-	if conf.IndexFilePath == "" {
-		return fmt.Errorf("missing path to index file (indexFilePath)")
+	if conf.IndexDirPath == "" {
+		return fmt.Errorf("missing path to index dir (indexDirPath)")
+	}
+	isDir, err := fs.IsDir(conf.IndexDirPath)
+	if err != nil {
+		return err
+	} else if !isDir {
+		return fmt.Errorf("index dir does not exist (indexDirPath)")
 	}
 	return nil
 }

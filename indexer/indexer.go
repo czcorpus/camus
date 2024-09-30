@@ -93,10 +93,10 @@ func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
 }
 
 func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
-	bleveIdx, err := bleve.Open(conf.IndexFilePath)
-	if err == bleve.ErrorIndexMetaMissing {
+	bleveIdx, err := bleve.Open(conf.IndexDirPath)
+	if err == bleve.ErrorIndexMetaMissing || err == bleve.ErrorIndexPathDoesNotExist {
 		mapping := CreateMapping()
-		bleveIdx, err = bleve.New(conf.IndexFilePath, mapping)
+		bleveIdx, err = bleve.New(conf.IndexDirPath, mapping)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new index: %w", err)
 		}
