@@ -100,6 +100,9 @@ func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new index: %w", err)
 		}
+
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to open index: %w", err)
 	}
 	return &Indexer{
 		conf:     conf,
