@@ -32,6 +32,7 @@ import (
 
 type Actions struct {
 	service *Service
+	db      cncdb.IMySQLOps
 }
 
 func (a *Actions) RecordToDoc(ctx *gin.Context) {
@@ -44,7 +45,7 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	doc, err := indexer.RecToDoc(&rec)
+	doc, err := indexer.RecToDoc(&rec, a.db)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return

@@ -70,6 +70,7 @@ type QueryRecord struct {
 	Q          []string       `json:"q"`
 	LastopForm map[string]any `json:"lastop_form"`
 	Corpora    []string       `json:"corpora"`
+	Subcorpus  string         `json:"usesubcorp"`
 }
 
 func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
@@ -162,4 +163,8 @@ func (qr *QueryRecord) GetRawQueries() ([]RawQuery, error) {
 		ans = append(ans, RawQuery{Value: vt, Type: queryTypes[corp]})
 	}
 	return ans, nil
+}
+
+func (qr *QueryRecord) GetSubcorpus(db IMySQLOps) (string, error) {
+	return db.GetSubcorpusName(qr.Subcorpus)
 }

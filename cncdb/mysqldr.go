@@ -69,6 +69,10 @@ func (ops *MySQLDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ops.db.GetArchSizesByYears(forceLoad)
 }
 
+func (ops *MySQLDryRun) GetSubcorpusName(subcID string) (string, error) {
+	return ops.db.GetSubcorpusName(subcID)
+}
+
 func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {
 	return &MySQLDryRun{db: ops}
 }

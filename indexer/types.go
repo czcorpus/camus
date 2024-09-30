@@ -65,9 +65,17 @@ func CreateMapping() mapping.IndexMapping {
 
 	bdocMapping := bleve.NewDocumentMapping()
 	bdocMapping.AddFieldMappingsAt("id", exactStringMapping)
-	bdocMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	bdocMapping.AddFieldMappingsAt("created", dtMapping)
+	bdocMapping.AddFieldMappingsAt("user_id", exactStringMapping)
+	bdocMapping.AddFieldMappingsAt("is_simple_query", exactStringMapping)
+	bdocMapping.AddFieldMappingsAt("corpora", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("subcorpus", exactStringMapping)
 	bdocMapping.AddFieldMappingsAt("raw_query", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("structures", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("struct_attr_names", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("struct_attr_values", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("pos_attr_names", multiValMapping)
+	bdocMapping.AddFieldMappingsAt("pos_attr_values", multiValMapping)
 
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.AddDocumentMapping("query", bdocMapping)

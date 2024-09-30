@@ -74,7 +74,7 @@ func (doc *Document) IsValidCQLQuery(idx int) bool {
 	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
 }
 
-func RecToDoc(arec *cncdb.ArchRecord) (*Document, error) {
+func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (*Document, error) {
 	var rec cncdb.QueryRecord
 	if err := json.Unmarshal([]byte(arec.Data), &rec); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
@@ -90,9 +90,16 @@ func RecToDoc(arec *cncdb.ArchRecord) (*Document, error) {
 
 	fmt.Println("SelectedTextTypes: ", rec.GetTextTypes())
 
+	subc, err := rec.GetSubcorpus(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert rec to doc: %w", err)
+	}
+
 	ans := &Document{
 		Created:        arec.Created,
 		UserID:         rec.UserID,
+		Corpora:        rec.Corpora,
+		Subcorpus:      subc,
 		QuerySupertype: qstype,
 		RawQueries:     rawq,
 	}

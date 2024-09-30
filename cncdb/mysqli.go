@@ -36,4 +36,6 @@ type IMySQLOps interface {
 	// defined night time.
 	// Returns list of pairs where FIRST item is always YEAR, the SECOND one is COUNT
 	GetArchSizesByYears(forceLoad bool) ([][2]int, error)
+
+	GetSubcorpusName(subcID string) (string, error)
 }

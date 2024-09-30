@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 )
 
@@ -38,7 +39,7 @@ func (idx *Indexer) IndexRecords() error {
 		return err
 	}
 	for _, rec := range results {
-		doc, err := RecToDoc(&rec)
+		doc, err := RecToDoc(&rec, idx.db)
 		if err != nil {
 			log.Debug().Err(err).Any("rec", rec).Send()
 			continue
@@ -61,15 +62,16 @@ func (idx *Indexer) IndexRecords() error {
 			ID:               rec.ID,
 			Created:          rec.Created,
 			UserID:           strconv.Itoa(doc.UserID),
-			Corpora:          strings.Join(doc.Corpora, ","),
+			Corpora:          strings.Join(doc.Corpora, " "),
 			Subcorpus:        doc.Subcorpus,
 			RawQuery:         doc.GetRawQueriesAsString(),
-			Structures:       strings.Join(doc.Structures, ","),
-			StructAttrNames:  strings.Join(structAttrNames, ","),
-			StructAttrValues: strings.Join(structAttrValues, ","),
-			PosAttrNames:     strings.Join(posAttrNames, ","),
-			PosAttrValues:    strings.Join(posAttrValues, ","),
+			Structures:       strings.Join(doc.Structures, " "),
+			StructAttrNames:  strings.Join(structAttrNames, " "),
+			StructAttrValues: strings.Join(structAttrValues, " "),
+			PosAttrNames:     strings.Join(posAttrNames, " "),
+			PosAttrValues:    strings.Join(posAttrValues, " "),
 		}
+		spew.Dump(bDoc)
 		err = idx.bleveIdx.Index(bDoc.ID, bDoc)
 		if err != nil {
 			return err

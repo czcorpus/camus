@@ -213,6 +213,19 @@ func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ans, nil
 }
 
+func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
+	row := ops.db.QueryRow(
+		"SELECT name FROM kontext_subcorpus WHERE id = ?", subcID)
+	var name string
+	if err := row.Scan(&name); err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get subcorpus name: %w", err)
+	}
+	return name, nil
+}
+
 func NewMySQLOps(db *sql.DB, tz *time.Location) *MySQLOps {
 	return &MySQLOps{
 		db: db,
