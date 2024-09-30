@@ -18,6 +18,7 @@ package indexer
 
 import (
 	"camus/cncdb"
+	"camus/indexer/documents"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,6 +34,37 @@ type Indexer struct {
 	bleveIdx bleve.Index
 }
 
+func (idx *Indexer) procMidConc(doc *documents.MidConc) IndexableDoc {
+	posAttrNames := make([]string, 0, 5)
+	posAttrValues := make([]string, 0, 5)
+	for name, values := range doc.PosAttrs {
+		posAttrNames = append(posAttrNames, name)
+		posAttrValues = append(posAttrValues, values...)
+	}
+
+	structAttrNames := make([]string, 0, 5)
+	structAttrValues := make([]string, 0, 5)
+	for name, values := range doc.StructAttrs {
+		structAttrNames = append(structAttrNames, name)
+		structAttrValues = append(structAttrValues, values...)
+	}
+	bDoc := &documents.Concordance{
+		ID:               doc.ID,
+		Created:          doc.Created,
+		UserID:           strconv.Itoa(doc.UserID),
+		Corpora:          strings.Join(doc.Corpora, " "),
+		Subcorpus:        doc.Subcorpus,
+		RawQuery:         doc.GetRawQueriesAsString(),
+		Structures:       strings.Join(doc.Structures, " "),
+		StructAttrNames:  strings.Join(structAttrNames, " "),
+		StructAttrValues: strings.Join(structAttrValues, " "),
+		PosAttrNames:     strings.Join(posAttrNames, " "),
+		PosAttrValues:    strings.Join(posAttrValues, " "),
+	}
+	spew.Dump(bDoc)
+	return bDoc
+}
+
 func (idx *Indexer) IndexRecords() error {
 	results, err := idx.db.LoadRecentNRecords(1000)
 	if err != nil {
@@ -40,39 +72,25 @@ func (idx *Indexer) IndexRecords() error {
 	}
 	for _, rec := range results {
 		doc, err := RecToDoc(&rec, idx.db)
-		if err != nil {
-			log.Debug().Err(err).Any("rec", rec).Send()
+		if err == ErrRecordNotIndexable {
+			continue
+
+		} else if err != nil {
+			log.Error().Err(err).Any("rec", rec).Msg("invalid record")
 			continue
 		}
-
-		posAttrNames := make([]string, 0, 5)
-		posAttrValues := make([]string, 0, 5)
-		for name, values := range doc.PosAttrs {
-			posAttrNames = append(posAttrNames, name)
-			posAttrValues = append(posAttrNames, values...)
+		var docToIndex IndexableDoc
+		switch tDoc := doc.(type) {
+		case *documents.MidConc:
+			docToIndex = idx.procMidConc(tDoc)
 		}
-
-		structAttrNames := make([]string, 0, 5)
-		structAttrValues := make([]string, 0, 5)
-		for name, values := range doc.StructAttrs {
-			structAttrNames = append(structAttrNames, name)
-			structAttrValues = append(structAttrValues, values...)
+		if docToIndex == nil {
+			log.Error().
+				Str("id", doc.GetID()).
+				Msg("failed to transform intermediate document to indexable document, skipping")
+			continue
 		}
-		bDoc := BleveDoc{
-			ID:               rec.ID,
-			Created:          rec.Created,
-			UserID:           strconv.Itoa(doc.UserID),
-			Corpora:          strings.Join(doc.Corpora, " "),
-			Subcorpus:        doc.Subcorpus,
-			RawQuery:         doc.GetRawQueriesAsString(),
-			Structures:       strings.Join(doc.Structures, " "),
-			StructAttrNames:  strings.Join(structAttrNames, " "),
-			StructAttrValues: strings.Join(structAttrValues, " "),
-			PosAttrNames:     strings.Join(posAttrNames, " "),
-			PosAttrValues:    strings.Join(posAttrValues, " "),
-		}
-		spew.Dump(bDoc)
-		err = idx.bleveIdx.Index(bDoc.ID, bDoc)
+		err = idx.bleveIdx.Index(docToIndex.GetID(), docToIndex)
 		if err != nil {
 			return err
 		}
@@ -95,7 +113,7 @@ func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
 func NewIndexer(conf *Conf, db cncdb.IMySQLOps) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexDirPath)
 	if err == bleve.ErrorIndexMetaMissing || err == bleve.ErrorIndexPathDoesNotExist {
-		mapping := CreateMapping()
+		mapping := documents.CreateMapping()
 		bleveIdx, err = bleve.New(conf.IndexDirPath, mapping)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new index: %w", err)

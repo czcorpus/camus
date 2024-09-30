@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package indexer
+package documents
 
 import (
 	"camus/cncdb"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestExtractCQLProps(t *testing.T) {
-	doc := Document{
+	doc := MidConc{
 		RawQueries: []cncdb.RawQuery{
 			{
 				Value: `[word="hi|hello"] [lemma="people" & tag="N.*" & word="p.*"] within <text txtypegroup="FIC: beletrie">`,
@@ -33,12 +33,11 @@ func TestExtractCQLProps(t *testing.T) {
 			},
 		},
 	}
-	err := extractCQLProps(&doc)
+	err := ExtractCQLProps(&doc)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"hi|hello", "p.*"}, doc.PosAttrs["word"])
 	assert.Equal(t, []string{"people"}, doc.PosAttrs["lemma"])
 	assert.Equal(t, []string{"N.*"}, doc.PosAttrs["tag"])
 	assert.Equal(t, []string{"text"}, doc.Structures)
 	assert.Equal(t, []string{"FIC: beletrie"}, doc.StructAttrs["text.txtypegroup"])
-
 }

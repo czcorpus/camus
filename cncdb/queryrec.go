@@ -18,27 +18,24 @@
 package cncdb
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	QuerySupertypeConc   QuerySupertype = "conc"
-	QuerySupertypePquery QuerySupertype = "pquery"
-	QuerySupertypeWlist  QuerySupertype = "wlist"
-	QuerySupertypeKwords QuerySupertype = "kwords"
+	QuerySupertypeConc        QuerySupertype = "conc"
+	QuerySupertypePquery      QuerySupertype = "pquery"
+	QuerySupertypeWlist       QuerySupertype = "wlist"
+	QuerySupertypeKwords      QuerySupertype = "kwords"
+	QuerySupertypeUnsupported QuerySupertype = ""
 )
 
 type QuerySupertype string
 
-func (qs QuerySupertype) Validate() error {
-	if qs == QuerySupertypeConc || qs == QuerySupertypePquery || qs == QuerySupertypeWlist ||
-		qs == QuerySupertypeKwords {
-		return nil
-	}
-	return fmt.Errorf("invalid QuerySupertype: %s", qs)
+func (qs QuerySupertype) IsIndexable() bool {
+	return qs == QuerySupertypeConc || qs == QuerySupertypePquery || qs == QuerySupertypeWlist ||
+		qs == QuerySupertypeKwords
 }
 
 func FormTypeToSupertype(ft string) QuerySupertype {
@@ -52,13 +49,9 @@ func FormTypeToSupertype(ft string) QuerySupertype {
 	case "kwords":
 		return QuerySupertypeKwords
 	default:
-		return ""
+		return QuerySupertypeUnsupported
 	}
 }
-
-var (
-	ErrUnexpectedRecordStructure = errors.New("unexpected record structure")
-)
 
 type RawQuery struct {
 	Value string `json:"value"`
@@ -76,16 +69,13 @@ type QueryRecord struct {
 func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
 	v, ok := qr.LastopForm["form_type"]
 	if !ok {
-		return "", ErrUnexpectedRecordStructure
+		return "", fmt.Errorf("failed to get query supertype - no `form_type` entry found")
 	}
 	tv, ok := v.(string)
 	if !ok {
 		return "", fmt.Errorf("type assertion failed on query supertype %s", v)
 	}
 	st := FormTypeToSupertype(tv)
-	if err := st.Validate(); err != nil {
-		return "", fmt.Errorf("failed to get supertype: %w", err)
-	}
 	return st, nil
 }
 
@@ -124,16 +114,17 @@ func (qr *QueryRecord) getQueryTypes() (map[string]string, error) {
 	ans := make(map[string]string)
 	v, ok := qr.LastopForm["curr_query_types"]
 	if !ok {
-		return ans, ErrUnexpectedRecordStructure
+		return ans, fmt.Errorf("failed to determine conc. query types - no `curr_query_types` entry")
 	}
 	vt, ok := v.(map[string]any)
 	if !ok {
-		return ans, ErrUnexpectedRecordStructure
+		return ans, fmt.Errorf("failed to determine conc. query types - `curr_query_types` has invalid type")
 	}
 	for k, v := range vt {
 		vt, ok := v.(string)
 		if !ok {
-			return ans, ErrUnexpectedRecordStructure
+			return ans, fmt.Errorf(
+				"failed to determine conc. query types - entry for %s has invalid type", k)
 		}
 		ans[k] = vt
 	}
@@ -143,22 +134,23 @@ func (qr *QueryRecord) getQueryTypes() (map[string]string, error) {
 func (qr *QueryRecord) GetRawQueries() ([]RawQuery, error) {
 	v, ok := qr.LastopForm["curr_queries"]
 	if !ok {
-		return []RawQuery{}, ErrUnexpectedRecordStructure
+		return []RawQuery{}, fmt.Errorf("failed to get raw queries - no `curr_queries` entry found")
 	}
 	queries, ok := v.(map[string]any)
 	if !ok {
-		return []RawQuery{}, ErrUnexpectedRecordStructure
+		return []RawQuery{}, fmt.Errorf("failed to get raw queries - `curr_queries` entry has invalid type")
 	}
 	queryTypes, err := qr.getQueryTypes()
 	if err != nil {
-		return []RawQuery{}, ErrUnexpectedRecordStructure
+		return []RawQuery{}, fmt.Errorf("failed to get raw queries: %w", err)
 	}
 
 	ans := make([]RawQuery, 0, 10)
 	for corp, v := range queries {
 		vt, ok := v.(string)
 		if !ok {
-			return []RawQuery{}, ErrUnexpectedRecordStructure
+			return []RawQuery{}, fmt.Errorf(
+				"failed to get raw queries - entry for %s has invalid type", corp)
 		}
 		ans = append(ans, RawQuery{Value: vt, Type: queryTypes[corp]})
 	}

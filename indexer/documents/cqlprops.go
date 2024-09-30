@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package indexer
+package documents
 
 import (
 	"fmt"
@@ -23,12 +23,12 @@ import (
 	"github.com/czcorpus/cqlizer/cql"
 )
 
-// extractCQLProps parses queries stored in `doc` and
+// ExtractCQLProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func extractCQLProps(doc *Document) error {
+func ExtractCQLProps(doc *MidConc) error {
 
 	doc.StructAttrs = make(map[string][]string)
 	doc.PosAttrs = make(map[string][]string)

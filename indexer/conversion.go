@@ -19,62 +19,32 @@ package indexer
 
 import (
 	"camus/cncdb"
+	"camus/indexer/documents"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
-	"time"
+
+	"github.com/blevesearch/bleve/v2/mapping"
 )
 
-// Document is a KonText query representation intended for
-// fulltext indexing and search
-type Document struct {
-	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
+var (
+	ErrRecordNotIndexable = errors.New("record is not indexable")
+)
 
-	Created time.Time `json:"created"`
-
-	UserID int `json:"userId"`
-
-	// Corpora contains all the searched corpora. Lenght > 1 means
-	// the search was performed on a parallel corpus
-	Corpora []string `json:"corpora"`
-
-	Subcorpus string `json:"subcorpus"`
-
-	// RawQuery is the original query written by a user
-	// (multiple queries = aligned corpora)
-	RawQueries []cncdb.RawQuery `json:"rawQueries"`
-
-	// Structures contains a list of all structures involved in the query
-	Structures []string `json:"structures"`
-
-	// StructAttrs contains all the structural attributes and their values
-	// used in the query. It does not matter whether the chunks were attr=val
-	// or attr!=val. We want just to know which values are associated to which
-	// attributes.
-	// A typical source is `... within <doc txtype="fiction" & pubyear="2020" />`
-	StructAttrs map[string][]string `json:"structAttrs"`
-
-	// PosAttrs contains all the positional attributes and their values
-	// in the query.
-	PosAttrs map[string][]string `json:"posAttrs"`
+type IndexableMidDoc interface {
+	GetQuerySupertype() cncdb.QuerySupertype
+	GetID() string
 }
 
-func (doc *Document) GetRawQueriesAsString() string {
-	var ans strings.Builder
-	for _, v := range doc.RawQueries {
-		ans.WriteString(" " + v.Value)
-	}
-	return ans.String()
+type IndexableDoc interface {
+	mapping.Classifier
+	GetID() string
 }
 
-// IsValidCQLQuery tests for indexability of a query at position idx
-// (when considering a possible query to aligned corpora; for single-corpus
-// queries, idx==0 is the only option)
-func (doc *Document) IsValidCQLQuery(idx int) bool {
-	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
-}
-
-func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (*Document, error) {
+// RecToDoc converts a conc/wlist/... archive record into an indexable
+// document. In case the record is OK but of an unsupported type (e.g. "shuffle"),
+// nil document is returned along with ErrRecordNotIndexable error.
+func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (IndexableMidDoc, error) {
 	var rec cncdb.QueryRecord
 	if err := json.Unmarshal([]byte(arec.Data), &rec); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
@@ -82,6 +52,9 @@ func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (*Document, error) {
 	qstype, err := rec.GetSupertype()
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
+	}
+	if !qstype.IsIndexable() {
+		return nil, ErrRecordNotIndexable
 	}
 	rawq, err := rec.GetRawQueries()
 	if err != nil {
@@ -95,7 +68,8 @@ func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (*Document, error) {
 		return nil, fmt.Errorf("failed to convert rec to doc: %w", err)
 	}
 
-	ans := &Document{
+	ans := &documents.MidConc{
+		ID:             arec.ID,
 		Created:        arec.Created,
 		UserID:         rec.UserID,
 		Corpora:        rec.Corpora,
@@ -104,7 +78,7 @@ func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps) (*Document, error) {
 		RawQueries:     rawq,
 	}
 
-	if err := extractCQLProps(ans); err != nil {
+	if err := documents.ExtractCQLProps(ans); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
 

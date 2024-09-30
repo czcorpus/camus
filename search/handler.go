@@ -46,7 +46,11 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		return
 	}
 	doc, err := indexer.RecToDoc(&rec, a.db)
-	if err != nil {
+	if err == indexer.ErrRecordNotIndexable {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusUnprocessableEntity)
+		return
+
+	} else if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
