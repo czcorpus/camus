@@ -112,7 +112,7 @@ func (job *ArchKeeper) handleImplicitReq(
 			Err(err).
 			Str("recordId", item.Key).
 			Msg("failed to insert record, skipping")
-		if err := job.redis.AddError(item, &rec); err != nil {
+		if err := job.redis.AddError(job.conf.FailedQueueKey, item, &rec); err != nil {
 			log.Error().Err(err).Msg("failed to insert error key")
 		}
 		currStats.NumErrors++
@@ -130,7 +130,7 @@ func (job *ArchKeeper) handleImplicitReq(
 			Err(err).
 			Str("recordId", item.Key).
 			Msg("failed to insert record, skipping")
-		if err := job.redis.AddError(item, &rec); err != nil {
+		if err := job.redis.AddError(job.conf.FailedQueueKey, item, &rec); err != nil {
 			log.Error().Err(err).Msg("failed to insert error key")
 		}
 	}
@@ -166,7 +166,7 @@ func (job *ArchKeeper) handleExplicitReq(
 }
 
 func (job *ArchKeeper) performCheck() error {
-	items, err := job.redis.NextNArchItems(int64(job.conf.CheckIntervalChunk))
+	items, err := job.redis.NextNArchItems(job.conf.QueueKey, int64(job.conf.CheckIntervalChunk))
 	log.Debug().
 		AnErr("error", err).
 		Int("itemsToProcess", len(items)).
@@ -184,7 +184,7 @@ func (job *ArchKeeper) performCheck() error {
 				Err(err).
 				Str("recordId", item.Key).
 				Msg("failed to get record from Redis, skipping")
-			if err := job.redis.AddError(item, nil); err != nil {
+			if err := job.redis.AddError(job.conf.FailedQueueKey, item, nil); err != nil {
 				log.Error().Err(err).Msg("failed to insert error key")
 			}
 			currStats.NumErrors++

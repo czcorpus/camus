@@ -18,35 +18,18 @@ package archiver
 
 import (
 	"fmt"
-
-	"github.com/rs/zerolog/log"
 )
 
 type RedisConf struct {
-	Host             string `json:"host"`
-	Port             int    `json:"port"`
-	DB               int    `json:"db"`
-	Password         string `json:"password"`
-	QueueKey         string `json:"queueKey"`
-	FailedQueueKey   string `json:"failedQueueKey"`
-	FailedRecordsKey string `json:"failedRecordsKey"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	DB       int    `json:"db"`
+	Password string `json:"password"`
 }
 
 func (conf *RedisConf) ValidateAndDefaults() error {
 	if conf.DB == 0 {
 		return fmt.Errorf("missing Redis configuration: `db`")
-	}
-	if conf.QueueKey == "" {
-		return fmt.Errorf("missing Redis configuration: `queueKey`")
-	}
-	if conf.FailedQueueKey == "" {
-		conf.FailedQueueKey = conf.QueueKey + "_failed"
-		log.Warn().
-			Str("value", conf.FailedQueueKey).
-			Msg("Redis configuration `failedQueueKey` missing - using default")
-	}
-	if conf.FailedRecordsKey == "" {
-		return fmt.Errorf("missing Redis configuration: `failedRecordsKey`")
 	}
 	return nil
 }

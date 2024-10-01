@@ -56,6 +56,10 @@ type Conf struct {
 	// Note: the sole existence of duplicites is not a big issue. We are trying to
 	// avoid them to save disk space and make database more responsive.
 	PreloadLastNItems int `json:"preloadLastNItems"`
+
+	QueueKey         string `json:"queueKey"`
+	FailedQueueKey   string `json:"failedQueueKey"`
+	FailedRecordsKey string `json:"failedRecordsKey"`
 }
 
 func (conf *Conf) CheckInterval() time.Duration {
@@ -67,7 +71,7 @@ func (conf *Conf) ValidateAndDefaults() error {
 		return fmt.Errorf("missing `archiver` section")
 	}
 	if conf.DDStateFilePath == "" {
-		return fmt.Errorf("missing path to deduplicator state file (ddStateFilePath)")
+		return fmt.Errorf("value `archiver.ddStateFilePath` missing")
 	}
 
 	tmp, err := util.NearestPrime(conf.CheckIntervalSecs)
@@ -78,7 +82,7 @@ func (conf *Conf) ValidateAndDefaults() error {
 		log.Warn().
 			Int("oldValue", conf.CheckIntervalSecs).
 			Int("newValue", tmp).
-			Msg("tuned value of checkIntervalSecs so it cannot be easily overlapped by other timers")
+			Msg("tuned value of `archiver.checkIntervalSecs` so it cannot be easily overlapped by other timers")
 		conf.CheckIntervalSecs = tmp
 	}
 
@@ -86,7 +90,20 @@ func (conf *Conf) ValidateAndDefaults() error {
 		conf.PreloadLastNItems = dfltPreloadLastNItems
 		log.Warn().
 			Int("value", conf.PreloadLastNItems).
-			Msg("archiver value `preloadLastNItems` not set, using default")
+			Msg("value `archiver.preloadLastNItems` not set, using default")
+	}
+
+	if conf.QueueKey == "" {
+		return fmt.Errorf("missing configuration: `archiver.queueKey`")
+	}
+	if conf.FailedQueueKey == "" {
+		conf.FailedQueueKey = conf.QueueKey + "_failed"
+		log.Warn().
+			Str("value", conf.FailedQueueKey).
+			Msg("missing configuration `archiver.failedQueueKey` - using default")
+	}
+	if conf.FailedRecordsKey == "" {
+		return fmt.Errorf("missing configuration: `archiver.failedRecordsKey`")
 	}
 
 	return nil

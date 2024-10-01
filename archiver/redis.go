@@ -84,12 +84,11 @@ func (rd *RedisAdapter) NextQueueItem(queue string) (string, error) {
 	return lpopCmd.Val(), nil
 }
 
-func (rd *RedisAdapter) NextNArchItems(n int64) ([]queueRecord, error) {
+func (rd *RedisAdapter) NextNArchItems(queueKey string, n int64) ([]queueRecord, error) {
 	ans := make([]queueRecord, 0, n)
 	ppl := rd.redis.Pipeline()
-	fmt.Println(">>> FETCHING FROM ", rd.conf.QueueKey)
-	lrangeCmd := ppl.LRange(rd.ctx, rd.conf.QueueKey, -n, -1)
-	ppl.LTrim(rd.ctx, rd.conf.QueueKey, 0, -n-1)
+	lrangeCmd := ppl.LRange(rd.ctx, queueKey, -n, -1)
+	ppl.LTrim(rd.ctx, queueKey, 0, -n-1)
 	_, err := ppl.Exec(rd.ctx)
 	if err != nil {
 		return []queueRecord{}, fmt.Errorf("failed to get items from queue: %w", err)
@@ -115,18 +114,17 @@ func (rd *RedisAdapter) NextNArchItems(n int64) ([]queueRecord, error) {
 	return ans, nil
 }
 
-func (rd *RedisAdapter) AddError(item queueRecord, rec *cncdb.ArchRecord) error {
+func (rd *RedisAdapter) AddError(errQueue string, item queueRecord, rec *cncdb.ArchRecord) error {
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("failed to add error record %s: %w", item.Key, err)
 	}
-	cmd := rd.redis.LPush(rd.ctx, rd.conf.FailedQueueKey, string(itemJSON))
+	cmd := rd.redis.LPush(rd.ctx, errQueue, string(itemJSON))
 	if cmd.Err() != nil {
 		return fmt.Errorf("failed to insert error key %s: %w", item.Key, cmd.Err())
 	}
 	if rec != nil {
-		cmd = rd.redis.HSet(
-			rd.ctx, rd.conf.FailedRecordsKey, item.Key, rec.Data)
+		cmd = rd.redis.HSet(rd.ctx, errQueue, item.Key, rec.Data)
 		if cmd.Err() != nil {
 			return fmt.Errorf("failed to insert error record %s: %w", item.Key, cmd.Err())
 		}
