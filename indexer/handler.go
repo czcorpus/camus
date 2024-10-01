@@ -18,17 +18,39 @@ package indexer
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	defaultNumRecentRecs = 100
 )
 
 type Actions struct {
 	indexer *Indexer
 }
 
-func (a *Actions) IndexRecords(ctx *gin.Context) {
-	if err := a.indexer.IndexRecords(); err != nil {
+func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
+	numRec := ctx.Query("numRec")
+	if numRec == "" {
+		newURL := *ctx.Request.URL
+		newQuery := newURL.Query()
+		newQuery.Set("numRec", strconv.Itoa(defaultNumRecentRecs))
+		newURL.RawQuery = newQuery.Encode()
+		ctx.Redirect(http.StatusSeeOther, newURL.String())
+		return
+	}
+
+	iNumRec, err := strconv.Atoi(numRec)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+
+	numProc, err := a.indexer.IndexRecentRecords(iNumRec)
+	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
@@ -37,7 +59,10 @@ func (a *Actions) IndexRecords(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	resp := map[string]any{"documents": count}
+	resp := map[string]any{
+		"totalDocuments": count,
+		"numProcessed":   numProc,
+	}
 	uniresp.WriteJSONResponse(ctx.Writer, resp)
 }
 

@@ -65,7 +65,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.DELETE("/search/records", fulltextHandler.RemoveFromIndex)
 
 	indexerHandler := indexer.NewActions(api.idx)
-	engine.GET("/indexer/build", indexerHandler.IndexRecords)
+	engine.GET("/indexer/build", indexerHandler.IndexLatestRecords)
 	engine.GET("/indexer/search", indexerHandler.Search)
 
 	api.server = &http.Server{

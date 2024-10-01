@@ -34,11 +34,18 @@ type Indexer struct {
 	recsToIndex <-chan cncdb.ArchRecord
 }
 
-func (idx *Indexer) IndexRecords() error {
-	results, err := idx.db.LoadRecentNRecords(1000)
+// IndexRecentRecords takes latest `numLatest` records and
+// (re)indexes them. It returns number of actually indexed
+// records and possible error. In case there are unindexable
+// records among the ones fetched for processing (which is a normal
+// - non error thing - e.g. sample, shuffle, filter,...),
+// such records are ignored.
+func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
+	results, err := idx.db.LoadRecentNRecords(numLatest)
 	if err != nil {
-		return fmt.Errorf("failed to index records: %w", err)
+		return 0, fmt.Errorf("failed to index records: %w", err)
 	}
+	var numIndexed int
 	for _, rec := range results {
 		err := idx.IndexRecord(rec)
 		if err == ErrRecordNotIndexable {
@@ -48,13 +55,19 @@ func (idx *Indexer) IndexRecords() error {
 			log.Error().Err(err).Any("rec", rec).Msg("invalid record, skipping")
 			continue
 		}
+		numIndexed++
 	}
-	return nil
+	return numIndexed, nil
 }
 
+// IndexRecord indexes a provided record. In case the record
+// is unsupported for indexing, ErrRecordNotIndexable is returned.
 func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) error {
 	doc, err := RecToDoc(&rec, idx.db)
-	if err != nil {
+	if err == ErrRecordNotIndexable {
+		return err
+
+	} else if err != nil {
 		return fmt.Errorf("failed to index record: %w", err)
 	}
 	docToIndex := doc.AsIndexableDoc()
