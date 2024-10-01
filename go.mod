@@ -3,7 +3,7 @@ module camus
 go 1.23.0
 
 require (
-	github.com/bits-and-blooms/bloom v2.0.3+incompatible
+	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/blevesearch/bleve/v2 v2.4.2
 	github.com/czcorpus/cnc-gokit v0.10.1
 	github.com/czcorpus/cqlizer v0.0.9
@@ -71,10 +71,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
-	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/willf/bitset v1.1.11 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	golang.org/x/arch v0.10.0 // indirect
 	golang.org/x/crypto v0.27.0 // indirect
