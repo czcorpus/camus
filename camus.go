@@ -59,6 +59,7 @@ type service interface {
 func createArchiver(
 	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
+	recsToIndex chan<- cncdb.ArchRecord,
 	reporting reporting.IReporting,
 	conf *cnf.Conf,
 ) *archiver.ArchKeeper {
@@ -72,6 +73,7 @@ func createArchiver(
 		rdb,
 		db,
 		dedup,
+		recsToIndex,
 		reporting,
 		conf.TimezoneLocation(),
 		conf.Archiver,
@@ -158,8 +160,6 @@ func main() {
 			dbOps = dbOpsRaw
 		}
 
-		arch := createArchiver(dbOps, rdb, reportingService, conf)
-
 		var cleanerDbOps cncdb.IMySQLOps
 		if *dryRunCleaner {
 			cleanerDbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
@@ -168,16 +168,20 @@ func main() {
 			cleanerDbOps = dbOps
 		}
 
-		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+		recsToIndex := make(chan cncdb.ArchRecord)
 
-		fulltext := search.NewService(conf.Indexer, rdb) // TODO attach to some filesystem location etc.
-
-		idx, err := indexer.NewIndexer(conf.Indexer, cleanerDbOps)
+		idx, err := indexer.NewIndexer(conf.Indexer, dbOps, recsToIndex)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to initialize index")
 			os.Exit(1)
 			return
 		}
+
+		arch := createArchiver(dbOps, rdb, recsToIndex, reportingService, conf)
+
+		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+
+		fulltext := search.NewService(conf.Indexer, rdb) // TODO attach to some filesystem location etc.
 
 		as := &apiServer{
 			arch:            arch,
@@ -188,7 +192,7 @@ func main() {
 
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		services := []service{arch, cln, fulltext, as, reportingService}
+		services := []service{idx, arch, cln, fulltext, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
 		}

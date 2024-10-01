@@ -43,13 +43,14 @@ import (
 // to prevent (at least some) recent duplicates so that the database
 // is reasonably large.
 type ArchKeeper struct {
-	redis     *RedisAdapter
-	db        cncdb.IMySQLOps
-	reporting reporting.IReporting
-	conf      *Conf
-	dedup     *Deduplicator
-	tz        *time.Location
-	stats     reporting.OpStats
+	redis       *RedisAdapter
+	db          cncdb.IMySQLOps
+	reporting   reporting.IReporting
+	conf        *Conf
+	dedup       *Deduplicator
+	tz          *time.Location
+	stats       reporting.OpStats
+	recsToIndex chan<- cncdb.ArchRecord
 }
 
 // Start starts the ArchKeeper service
@@ -71,6 +72,7 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 // Stop stops the ArchKeeper service
 func (job *ArchKeeper) Stop(ctx context.Context) error {
 	log.Warn().Msg("stopping ArchKeeper")
+	close(job.recsToIndex)
 	if err := job.dedup.OnClose(); err != nil {
 		return fmt.Errorf("failed to stop ArchKeeper properly: %w", err)
 	}
@@ -99,6 +101,8 @@ func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error
 	return job.db.LoadRecordsByID(concID)
 }
 
+// handleImplicitReq returns true if everything was ok, otherwise
+// false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(
 	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
 
@@ -193,6 +197,7 @@ func (job *ArchKeeper) performCheck() error {
 		} else {
 			job.handleImplicitReq(rec, item, &currStats)
 		}
+		job.recsToIndex <- rec
 	}
 	log.Info().
 		Int("numInserted", currStats.NumInserted).
@@ -214,16 +219,18 @@ func NewArchKeeper(
 	redis *RedisAdapter,
 	db cncdb.IMySQLOps,
 	dedup *Deduplicator,
+	recsToIndex chan<- cncdb.ArchRecord,
 	reporting reporting.IReporting,
 	tz *time.Location,
 	conf *Conf,
 ) *ArchKeeper {
 	return &ArchKeeper{
-		redis:     redis,
-		db:        db,
-		dedup:     dedup,
-		reporting: reporting,
-		tz:        tz,
-		conf:      conf,
+		redis:       redis,
+		db:          db,
+		dedup:       dedup,
+		recsToIndex: recsToIndex,
+		reporting:   reporting,
+		tz:          tz,
+		conf:        conf,
 	}
 }

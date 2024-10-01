@@ -19,8 +19,7 @@ package cncdb
 
 import (
 	"fmt"
-
-	"github.com/rs/zerolog/log"
+	"time"
 )
 
 const (
@@ -58,16 +57,53 @@ type RawQuery struct {
 	Type  string `json:"type"`
 }
 
-type QueryRecord struct {
-	UserID     int            `json:"user_id"`
-	Q          []string       `json:"q"`
-	LastopForm map[string]any `json:"lastop_form"`
-	Corpora    []string       `json:"corpora"`
-	Subcorpus  string         `json:"usesubcorp"`
+type concForm struct {
+	FormType          string              `json:"form_type"`
+	CurrQueryTypes    map[string]string   `json:"curr_query_types"`
+	CurrQueries       map[string]string   `json:"curr_queries"`
+	SelectedTextTypes map[string][]string `json:"selected_text_types"`
 }
 
-func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
+type wlistForm struct {
+	FormType     string   `json:"form_type"`
+	WLAttr       string   `json:"wlattr"`
+	WLPattern    string   `json:"wlpat"`
+	PFilterWords []string `json:"pfilter_words"`
+	NFilterWords []string `json:"nfilter_words"`
+}
+
+type ConcFormRecord struct {
+	LastopForm concForm `json:"lastop_form"`
+}
+
+type WlistFormRecord struct {
+	Form wlistForm `json:"form"`
+}
+
+// UntypedQueryRecord represents any query record as saved by
+// KonText. It is a mix of all possible variants
+// (conc, wlist, pquery, kwords) with many data access methods
+// for extracting supertype-specific values.
+// It is up to the user to determine which access methods to use
+// based on GetSupertype().
+type UntypedQueryRecord struct {
+	ID          string         `json:"id"`
+	Created     time.Time      `json:"-"`
+	UserID      int            `json:"user_id"`
+	Corpora     []string       `json:"corpora"`
+	SubcorpusID string         `json:"usesubcorp"`
+	LastopForm  map[string]any `json:"lastop_form"`
+	Form        map[string]any `json:"form"`
+}
+
+func (qr *UntypedQueryRecord) GetSupertype() (QuerySupertype, error) {
+	if qr.LastopForm == nil && qr.Form == nil {
+		return "", fmt.Errorf("cannot determine query supertype - no known form entry found")
+	}
 	v, ok := qr.LastopForm["form_type"]
+	if !ok {
+		v, ok = qr.Form["form_type"]
+	}
 	if !ok {
 		return "", fmt.Errorf("failed to get query supertype - no `form_type` entry found")
 	}
@@ -79,84 +115,6 @@ func (qr *QueryRecord) GetSupertype() (QuerySupertype, error) {
 	return st, nil
 }
 
-func (qr *QueryRecord) GetTextTypes() map[string][]string {
-	ans := make(map[string][]string)
-	v, ok := qr.LastopForm["selected_text_types"]
-	if !ok {
-		return ans
-	}
-	vt, ok := v.(map[string]any)
-	if !ok {
-		// TODO at least log this
-		log.Warn().Msg("unexpected structure of selected_text_types, not map[string]any")
-		return ans
-	}
-	for k, values := range vt {
-		tValues, ok := values.([]any)
-		if !ok {
-			log.Warn().Msg("unexpected structure of selected_text_types item, not []any")
-			// TODO at least log this
-			return ans
-		}
-		ans[k] = make([]string, len(tValues))
-		for i, v := range tValues {
-			vt, ok := v.(string)
-			if !ok {
-				log.Warn().Msg("unexpected value in selected_text_types item, not a string")
-			}
-			ans[k][i] = vt
-		}
-	}
-	return ans
-}
-
-func (qr *QueryRecord) getQueryTypes() (map[string]string, error) {
-	ans := make(map[string]string)
-	v, ok := qr.LastopForm["curr_query_types"]
-	if !ok {
-		return ans, fmt.Errorf("failed to determine conc. query types - no `curr_query_types` entry")
-	}
-	vt, ok := v.(map[string]any)
-	if !ok {
-		return ans, fmt.Errorf("failed to determine conc. query types - `curr_query_types` has invalid type")
-	}
-	for k, v := range vt {
-		vt, ok := v.(string)
-		if !ok {
-			return ans, fmt.Errorf(
-				"failed to determine conc. query types - entry for %s has invalid type", k)
-		}
-		ans[k] = vt
-	}
-	return ans, nil
-}
-
-func (qr *QueryRecord) GetRawQueries() ([]RawQuery, error) {
-	v, ok := qr.LastopForm["curr_queries"]
-	if !ok {
-		return []RawQuery{}, fmt.Errorf("failed to get raw queries - no `curr_queries` entry found")
-	}
-	queries, ok := v.(map[string]any)
-	if !ok {
-		return []RawQuery{}, fmt.Errorf("failed to get raw queries - `curr_queries` entry has invalid type")
-	}
-	queryTypes, err := qr.getQueryTypes()
-	if err != nil {
-		return []RawQuery{}, fmt.Errorf("failed to get raw queries: %w", err)
-	}
-
-	ans := make([]RawQuery, 0, 10)
-	for corp, v := range queries {
-		vt, ok := v.(string)
-		if !ok {
-			return []RawQuery{}, fmt.Errorf(
-				"failed to get raw queries - entry for %s has invalid type", corp)
-		}
-		ans = append(ans, RawQuery{Value: vt, Type: queryTypes[corp]})
-	}
-	return ans, nil
-}
-
-func (qr *QueryRecord) GetSubcorpus(db IMySQLOps) (string, error) {
-	return db.GetSubcorpusName(qr.Subcorpus)
+func (qr *UntypedQueryRecord) GetSubcorpus(db IMySQLOps) (string, error) {
+	return db.GetSubcorpusName(qr.SubcorpusID)
 }

@@ -18,8 +18,11 @@ package documents
 
 import (
 	"camus/cncdb"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type Concordance struct {
@@ -110,9 +113,44 @@ func (doc *MidConc) GetRawQueriesAsString() string {
 	return ans.String()
 }
 
+func (doc *MidConc) SetSubcorpusName(name string) {
+	doc.Subcorpus = name
+}
+
 // IsValidCQLQuery tests for indexability of a query at position idx
 // (when considering a possible query to aligned corpora; for single-corpus
 // queries, idx==0 is the only option)
 func (doc *MidConc) IsValidCQLQuery(idx int) bool {
 	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
+}
+
+func (doc *MidConc) AsIndexableDoc() IndexableDoc {
+	posAttrNames := make([]string, 0, 5)
+	posAttrValues := make([]string, 0, 5)
+	for name, values := range doc.PosAttrs {
+		posAttrNames = append(posAttrNames, name)
+		posAttrValues = append(posAttrValues, values...)
+	}
+
+	structAttrNames := make([]string, 0, 5)
+	structAttrValues := make([]string, 0, 5)
+	for name, values := range doc.StructAttrs {
+		structAttrNames = append(structAttrNames, name)
+		structAttrValues = append(structAttrValues, values...)
+	}
+	bDoc := &Concordance{
+		ID:               doc.ID,
+		Created:          doc.Created,
+		UserID:           strconv.Itoa(doc.UserID),
+		Corpora:          strings.Join(doc.Corpora, " "),
+		Subcorpus:        doc.Subcorpus,
+		RawQuery:         doc.GetRawQueriesAsString(),
+		Structures:       strings.Join(doc.Structures, " "),
+		StructAttrNames:  strings.Join(structAttrNames, " "),
+		StructAttrValues: strings.Join(structAttrValues, " "),
+		PosAttrNames:     strings.Join(posAttrNames, " "),
+		PosAttrValues:    strings.Join(posAttrValues, " "),
+	}
+	spew.Dump(bDoc)
+	return bDoc
 }
