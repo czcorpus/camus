@@ -87,6 +87,7 @@ func (rd *RedisAdapter) NextQueueItem(queue string) (string, error) {
 func (rd *RedisAdapter) NextNArchItems(n int64) ([]queueRecord, error) {
 	ans := make([]queueRecord, 0, n)
 	ppl := rd.redis.Pipeline()
+	fmt.Println(">>> FETCHING FROM ", rd.conf.QueueKey)
 	lrangeCmd := ppl.LRange(rd.ctx, rd.conf.QueueKey, -n, -1)
 	ppl.LTrim(rd.ctx, rd.conf.QueueKey, 0, -n-1)
 	_, err := ppl.Exec(rd.ctx)
@@ -94,6 +95,7 @@ func (rd *RedisAdapter) NextNArchItems(n int64) ([]queueRecord, error) {
 		return []queueRecord{}, fmt.Errorf("failed to get items from queue: %w", err)
 	}
 	items, err := lrangeCmd.Result()
+	fmt.Println("ITEMS: ", items)
 	if err != nil {
 		return []queueRecord{}, fmt.Errorf("failed to get items from queue: %w", err)
 	}
