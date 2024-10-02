@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2"
-	"github.com/blevesearch/bleve/v2/analysis/analyzer/simple"
+	"github.com/blevesearch/bleve/v2/analysis/analyzer/custom"
+	"github.com/blevesearch/bleve/v2/analysis/token/lowercase"
+	"github.com/blevesearch/bleve/v2/analysis/tokenizer/whitespace"
 	"github.com/blevesearch/bleve/v2/mapping"
 )
 
@@ -12,21 +14,22 @@ func CreateMapping() (mapping.IndexMapping, error) {
 
 	// whole index
 	indexMapping := bleve.NewIndexMapping()
-	indexMapping.DefaultAnalyzer = simple.Name
 
 	err := indexMapping.AddCustomAnalyzer(
 		"kontext_query_analyzer",
 		map[string]interface{}{
-			"type":      "custom",
-			"tokenizer": "whitespace",
+			"type":      custom.Name,
+			"tokenizer": whitespace.Name,
 			"token_filters": []string{
-				"lowercase",
+				lowercase.Name,
 			},
 		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize fulltext mappings: %w", err)
 	}
+
+	indexMapping.DefaultAnalyzer = "kontext_query_analyzer"
 
 	// field types
 	exactStringMapping := bleve.NewKeywordFieldMapping()
