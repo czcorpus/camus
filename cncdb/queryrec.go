@@ -72,12 +72,33 @@ type wlistForm struct {
 	NFilterWords []string `json:"nfilter_words"`
 }
 
+type kwordsForm struct {
+	FormType      string `json:"form_type"`
+	RefCorpname   string `json:"ref_corpname"`
+	RefUsesubcorp string `json:"ref_usesubcorp"`
+	WLAttr        string `json:"wlattr"`
+	WLPattern     string `json:"wlpat"`
+}
+
+type pqueryForm struct {
+	FormType string   `json:"form_type"`
+	ConcIDs  []string `json:"conc_ids"`
+}
+
 type ConcFormRecord struct {
 	LastopForm concForm `json:"lastop_form"`
 }
 
 type WlistFormRecord struct {
 	Form wlistForm `json:"form"`
+}
+
+type KwordsFormRecord struct {
+	Form kwordsForm `json:"form"`
+}
+
+type PQueryFormRecord struct {
+	Form pqueryForm `json:"form"`
 }
 
 // UntypedQueryRecord represents any query record as saved by

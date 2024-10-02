@@ -18,23 +18,27 @@
 package documents
 
 import (
+	"camus/cncdb"
 	"fmt"
 
 	"github.com/czcorpus/cqlizer/cql"
 )
+
+type CQLMidDoc interface {
+	AddStructAttr(name, value string)
+	AddPosAttr(name, value string)
+	AddStructure(name string)
+	GetRawQueries() []cncdb.RawQuery
+}
 
 // ExtractCQLProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func ExtractCQLProps(doc *MidConc) error {
+func ExtractCQLProps(doc CQLMidDoc) error {
 
-	doc.StructAttrs = make(map[string][]string)
-	doc.PosAttrs = make(map[string][]string)
-	doc.Structures = make([]string, 0, 5)
-
-	for i, rq := range doc.RawQueries {
+	for i, rq := range doc.GetRawQueries() {
 		if rq.Type != "advanced" {
 			continue
 		}
@@ -46,21 +50,13 @@ func ExtractCQLProps(doc *MidConc) error {
 		for _, cqlProp := range q.ExtractProps() {
 			if cqlProp.IsStructAttr() {
 				key := fmt.Sprintf("%s.%s", cqlProp.Structure, cqlProp.Name)
-				_, ok := doc.StructAttrs[key]
-				if !ok {
-					doc.StructAttrs[key] = make([]string, 0, 10)
-				}
-				doc.StructAttrs[key] = append(doc.StructAttrs[key], cqlProp.Value)
+				doc.AddStructAttr(key, cqlProp.Value)
 
 			} else if cqlProp.IsStructure() {
-				doc.Structures = append(doc.Structures, cqlProp.Structure)
+				doc.AddStructure(cqlProp.Structure)
 
 			} else if cqlProp.IsPosattr() {
-				_, ok := doc.PosAttrs[cqlProp.Name]
-				if !ok {
-					doc.PosAttrs[cqlProp.Name] = make([]string, 0, 10)
-				}
-				doc.PosAttrs[cqlProp.Name] = append(doc.PosAttrs[cqlProp.Name], cqlProp.Value)
+				doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
 			}
 		}
 	}

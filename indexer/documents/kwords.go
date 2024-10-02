@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-type Wordlist struct {
+type Kwords struct {
 	ID string `json:"id"`
 
 	Created time.Time `json:"created"`
@@ -39,66 +39,53 @@ type Wordlist struct {
 	RawQuery string `json:"raw_query"`
 
 	PosAttrNames string `json:"pos_attr_names"`
-
-	PFilterWords string `json:"pfilter_words"`
-
-	NFilterWords string `json:"nfilter_words"`
 }
 
-func (wlist *Wordlist) Type() string {
-	return "wlist"
+func (kw *Kwords) Type() string {
+	return "kwords"
 }
 
-func (wlist *Wordlist) GetID() string {
-	return wlist.ID
+func (kw *Kwords) GetID() string {
+	return kw.ID
 }
 
-// intermediate word list data
+// intermediate keywords record
 
-type MidWordlist struct {
+type MidKwords struct {
 	ID string `json:"id"`
-
-	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
 	Created time.Time `json:"created"`
 
+	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
+
 	UserID int `json:"userId"`
 
-	// Corpora contains all the searched corpora.
-	// In case of word list search, lenght > 1 cannot
-	// happen.
 	Corpora []string `json:"corpora"`
 
-	Subcorpus string `json:"subcorpus"`
+	Subcorpora []string `json:"subcorpora"`
 
 	RawQuery string `json:"rawQuery"`
 
 	PosAttrNames []string `json:"posAttrNames"`
-
-	PFilterWords []string `json:"pfilterWords"`
-
-	NFilterWords []string `json:"nfilterWords"`
 }
 
-func (mwl *MidWordlist) GetID() string {
-	return mwl.ID
+func (mkw *MidKwords) GetID() string {
+	return mkw.ID
 }
 
-func (mwl *MidWordlist) GetQuerySupertype() cncdb.QuerySupertype {
-	return mwl.QuerySupertype
+func (mkw *MidKwords) GetQuerySupertype() cncdb.QuerySupertype {
+	return mkw.QuerySupertype
 }
 
-func (mwl *MidWordlist) AsIndexableDoc() IndexableDoc {
-	return &Wordlist{
-		ID:             mwl.ID,
-		Created:        mwl.Created,
-		QuerySupertype: string(mwl.QuerySupertype),
-		UserID:         strconv.Itoa(mwl.UserID),
-		Corpora:        strings.Join(mwl.Corpora, " "),
-		Subcorpus:      mwl.Subcorpus,
-		RawQuery:       mwl.RawQuery,
-		PosAttrNames:   strings.Join(mwl.PosAttrNames, " "),
-		PFilterWords:   strings.Join(mwl.PFilterWords, " "),
-		NFilterWords:   strings.Join(mwl.NFilterWords, " "),
+func (mkw *MidKwords) AsIndexableDoc() IndexableDoc {
+	return &Kwords{
+		ID:             mkw.ID,
+		Created:        mkw.Created,
+		QuerySupertype: string(mkw.QuerySupertype),
+		UserID:         strconv.Itoa(mkw.UserID),
+		Corpora:        strings.Join(mkw.Corpora, " "),
+		Subcorpus:      strings.Join(mkw.Subcorpora, " "),
+		RawQuery:       mkw.RawQuery,
+		PosAttrNames:   strings.Join(mkw.PosAttrNames, " "),
 	}
 }

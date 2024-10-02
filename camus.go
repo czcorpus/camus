@@ -170,7 +170,7 @@ func main() {
 
 		recsToIndex := make(chan cncdb.ArchRecord)
 
-		idx, err := indexer.NewIndexer(conf.Indexer, dbOps, recsToIndex)
+		idx, err := indexer.NewIndexer(conf.Indexer, dbOps, rdb, recsToIndex)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to initialize index")
 			os.Exit(1)
@@ -187,6 +187,7 @@ func main() {
 			arch:            arch,
 			conf:            conf,
 			fulltextService: fulltext,
+			rdb:             rdb,
 			idx:             idx,
 		}
 

@@ -214,6 +214,9 @@ func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 }
 
 func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
+	if subcID == "" {
+		return "", nil
+	}
 	row := ops.db.QueryRow(
 		"SELECT name FROM kontext_subcorpus WHERE id = ?", subcID)
 	var name string

@@ -18,6 +18,7 @@
 package search
 
 import (
+	"camus/archiver"
 	"camus/cncdb"
 	"camus/indexer"
 	"fmt"
@@ -33,6 +34,7 @@ import (
 type Actions struct {
 	service *Service
 	db      cncdb.IMySQLOps
+	rdb     *archiver.RedisAdapter
 }
 
 func (a *Actions) RecordToDoc(ctx *gin.Context) {
@@ -45,7 +47,7 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	doc, err := indexer.RecToDoc(&rec, a.db)
+	doc, err := indexer.RecToDoc(&rec, a.db, a.rdb)
 	if err == indexer.ErrRecordNotIndexable {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusUnprocessableEntity)
 		return
@@ -74,6 +76,9 @@ func (a *Actions) BleveTest(ctx *gin.Context) {
 	keywordFieldMapping.Analyzer = keyword.Name
 }
 
-func NewActions(service *Service) *Actions {
-	return &Actions{service: service}
+func NewActions(service *Service, rdb *archiver.RedisAdapter) *Actions {
+	return &Actions{
+		service: service,
+		rdb:     rdb,
+	}
 }

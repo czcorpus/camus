@@ -37,6 +37,7 @@ type apiServer struct {
 	conf            *cnf.Conf
 	arch            *archiver.ArchKeeper
 	fulltextService *search.Service
+	rdb             *archiver.RedisAdapter
 	idx             *indexer.Indexer
 }
 
@@ -59,7 +60,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.POST("/fix/:id", archHandler.Fix)
 	engine.POST("/dedup-reset", archHandler.DedupReset)
 
-	fulltextHandler := search.NewActions(api.fulltextService)
+	fulltextHandler := search.NewActions(api.fulltextService, api.rdb)
 
 	engine.GET("/search/rec2doc", fulltextHandler.RecordToDoc)
 	engine.DELETE("/search/records", fulltextHandler.RemoveFromIndex)

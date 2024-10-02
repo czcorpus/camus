@@ -18,6 +18,7 @@
 package indexer
 
 import (
+	"camus/archiver"
 	"camus/cncdb"
 	"camus/indexer/documents"
 	"context"
@@ -30,6 +31,7 @@ import (
 type Indexer struct {
 	conf        *Conf
 	db          cncdb.IMySQLOps
+	rdb         *archiver.RedisAdapter
 	bleveIdx    bleve.Index
 	recsToIndex <-chan cncdb.ArchRecord
 }
@@ -47,8 +49,8 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 	}
 	var numIndexed int
 	for _, rec := range results {
-		err := idx.IndexRecord(rec)
-		if err == ErrRecordNotIndexable {
+		indexed, err := idx.IndexRecord(rec)
+		if !indexed && err == nil {
 			continue
 
 		} else if err != nil {
@@ -60,23 +62,27 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 	return numIndexed, nil
 }
 
-// IndexRecord indexes a provided record. In case the record
-// is unsupported for indexing, ErrRecordNotIndexable is returned.
-func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) error {
-	doc, err := RecToDoc(&rec, idx.db)
+// IndexRecord indexes a provided archive record. The returned bool
+// specifies whether the record was indexed. It is perfectly OK if
+// a provided document is not indexed and without returned error
+// as not all records we deal with are supported for indexing
+// (e.g. additional stages of concordance queries - like shuffle,
+// filter, ...)
+func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
+	doc, err := RecToDoc(&rec, idx.db, idx.rdb)
 	if err == ErrRecordNotIndexable {
-		return err
+		return false, nil
 
 	} else if err != nil {
-		return fmt.Errorf("failed to index record: %w", err)
+		return false, fmt.Errorf("failed to index record: %w", err)
 	}
 	docToIndex := doc.AsIndexableDoc()
 	err = idx.bleveIdx.Index(docToIndex.GetID(), docToIndex)
 	if err != nil {
-		return fmt.Errorf("failed to index record: %w", err)
+		return false, fmt.Errorf("failed to index record: %w", err)
 	}
 	log.Debug().Str("id", rec.ID).Msg("indexed record")
-	return nil
+	return true, nil
 }
 
 func (idx *Indexer) Count() (uint64, error) {
@@ -100,7 +106,7 @@ func (idx *Indexer) Start(ctx context.Context) {
 				log.Info().Msg("about to close ArchKeeper")
 				return
 			case rec := <-idx.recsToIndex:
-				if err := idx.IndexRecord(rec); err != nil {
+				if _, err := idx.IndexRecord(rec); err != nil {
 					log.Error().Err(err).Any("rec", rec).Msg("unable to index record")
 				}
 			}
@@ -113,7 +119,12 @@ func (idx *Indexer) Stop(ctx context.Context) error {
 	return nil
 }
 
-func NewIndexer(conf *Conf, db cncdb.IMySQLOps, recsToIndex <-chan cncdb.ArchRecord) (*Indexer, error) {
+func NewIndexer(
+	conf *Conf,
+	db cncdb.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+	recsToIndex <-chan cncdb.ArchRecord,
+) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexDirPath)
 	if err == bleve.ErrorIndexMetaMissing || err == bleve.ErrorIndexPathDoesNotExist {
 		mapping := documents.CreateMapping()
@@ -128,6 +139,7 @@ func NewIndexer(conf *Conf, db cncdb.IMySQLOps, recsToIndex <-chan cncdb.ArchRec
 	return &Indexer{
 		conf:        conf,
 		db:          db,
+		rdb:         rdb,
 		bleveIdx:    bleveIdx,
 		recsToIndex: recsToIndex,
 	}, nil

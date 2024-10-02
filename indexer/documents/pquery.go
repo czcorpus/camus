@@ -19,13 +19,10 @@ package documents
 import (
 	"camus/cncdb"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
-type Concordance struct {
+type PQuery struct {
 	ID string `json:"id"`
 
 	Created time.Time `json:"created"`
@@ -34,38 +31,24 @@ type Concordance struct {
 
 	UserID string `json:"user_id"`
 
-	IsSimpleQuery bool `json:"is_simple_query"`
-
 	Corpora string `json:"corpora"`
 
 	Subcorpus string `json:"subcorpus"`
 
-	RawQuery string `json:"raw_query"`
-
-	Structures string `json:"structures"`
-
-	StructAttrNames string `json:"struct_attr_names"`
-
-	StructAttrValues string `json:"struct_attr_values"`
-
-	PosAttrNames string `json:"pos_attr_names"`
-
-	PosAttrValues string `json:"pos_attr_values"`
+	RawQueries []cncdb.RawQuery `json:"rawQueries"`
 }
 
-func (bdoc *Concordance) Type() string {
-	return "conc"
+func (pq *PQuery) Type() string {
+	return "pquery"
 }
 
-func (bdoc *Concordance) GetID() string {
-	return bdoc.ID
+func (pq *PQuery) GetID() string {
+	return pq.ID
 }
 
-// intermediate concordance
+// intermediate PQuery
 
-// MidConc is a KonText conc. query representation intended for
-// fulltext indexing and search
-type MidConc struct {
+type MidPQuery struct {
 	ID string `json:"id"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
@@ -99,86 +82,46 @@ type MidConc struct {
 	PosAttrs map[string][]string `json:"posAttrs"`
 }
 
-// methods to comply with CQLMidDoc
-
-func (doc *MidConc) AddStructAttr(name, value string) {
+func (doc *MidPQuery) AddStructAttr(name, value string) {
 	if doc.StructAttrs == nil {
 		doc.StructAttrs = make(map[string][]string)
 	}
 	doc.StructAttrs[name] = append(doc.StructAttrs[name], value)
 }
 
-func (doc *MidConc) AddPosAttr(name, value string) {
+func (doc *MidPQuery) AddPosAttr(name, value string) {
 	if doc.PosAttrs == nil {
 		doc.PosAttrs = make(map[string][]string)
 	}
 	doc.PosAttrs[name] = append(doc.PosAttrs[name], value)
 }
 
-func (doc *MidConc) AddStructure(name string) {
+func (doc *MidPQuery) AddStructure(name string) {
 	if doc.Structures == nil {
 		doc.Structures = make([]string, 0, 5)
 	}
 	doc.Structures = append(doc.Structures, name)
 }
 
-func (doc *MidConc) GetRawQueries() []cncdb.RawQuery {
+func (doc *MidPQuery) GetRawQueries() []cncdb.RawQuery {
 	return doc.RawQueries
 }
 
 // methods to comply with IndexableMidDoc
 
-func (doc *MidConc) GetID() string {
+func (doc *MidPQuery) GetID() string {
 	return doc.ID
 }
 
-func (doc *MidConc) GetQuerySupertype() cncdb.QuerySupertype {
+func (doc *MidPQuery) GetQuerySupertype() cncdb.QuerySupertype {
 	return doc.QuerySupertype
 }
 
-func (doc *MidConc) GetRawQueriesAsString() string {
-	var ans strings.Builder
-	for _, v := range doc.RawQueries {
-		ans.WriteString(" " + v.Value)
+func (doc *MidPQuery) AsIndexableDoc() IndexableDoc {
+	return &PQuery{
+		ID:             doc.ID,
+		QuerySupertype: string(doc.QuerySupertype),
+		Created:        doc.Created,
+		UserID:         strconv.Itoa(doc.UserID),
 	}
-	return ans.String()
-}
-
-// IsValidCQLQuery tests for indexability of a query at position idx
-// (when considering a possible query to aligned corpora; for single-corpus
-// queries, idx==0 is the only option)
-func (doc *MidConc) IsValidCQLQuery(idx int) bool {
-	return len(doc.RawQueries) > idx && doc.RawQueries[idx].Type == "advanced"
-}
-
-func (doc *MidConc) AsIndexableDoc() IndexableDoc {
-	posAttrNames := make([]string, 0, 5)
-	posAttrValues := make([]string, 0, 5)
-	for name, values := range doc.PosAttrs {
-		posAttrNames = append(posAttrNames, name)
-		posAttrValues = append(posAttrValues, values...)
-	}
-
-	structAttrNames := make([]string, 0, 5)
-	structAttrValues := make([]string, 0, 5)
-	for name, values := range doc.StructAttrs {
-		structAttrNames = append(structAttrNames, name)
-		structAttrValues = append(structAttrValues, values...)
-	}
-	bDoc := &Concordance{
-		ID:               doc.ID,
-		Created:          doc.Created,
-		QuerySupertype:   string(doc.QuerySupertype),
-		UserID:           strconv.Itoa(doc.UserID),
-		Corpora:          strings.Join(doc.Corpora, " "),
-		Subcorpus:        doc.Subcorpus,
-		RawQuery:         doc.GetRawQueriesAsString(),
-		Structures:       strings.Join(doc.Structures, " "),
-		StructAttrNames:  strings.Join(structAttrNames, " "),
-		StructAttrValues: strings.Join(structAttrValues, " "),
-		PosAttrNames:     strings.Join(posAttrNames, " "),
-		PosAttrValues:    strings.Join(posAttrValues, " "),
-	}
-	spew.Dump(bDoc)
-	return bDoc
 }

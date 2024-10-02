@@ -37,5 +37,9 @@ type IMySQLOps interface {
 	// Returns list of pairs where FIRST item is always YEAR, the SECOND one is COUNT
 	GetArchSizesByYears(forceLoad bool) ([][2]int, error)
 
+	// GetSubcorpusName takes a subcorpus "hash" ID and returns
+	// a corresponding name defined by the author.
+	// The method should accept empty value by responding
+	// with empty value (and without error).
 	GetSubcorpusName(subcID string) (string, error)
 }
