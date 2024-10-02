@@ -83,7 +83,9 @@ func importConc(
 	if err := documents.ExtractCQLProps(ans); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
-
+	if ans.StructAttrs == nil {
+		ans.StructAttrs = make(map[string][]string)
+	}
 	for attr, items := range form.LastopForm.SelectedTextTypes {
 		_, ok := ans.StructAttrs[attr]
 		if !ok {
