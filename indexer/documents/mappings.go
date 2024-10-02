@@ -37,6 +37,7 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	// conc type
 	concMapping := bleve.NewDocumentMapping()
 	concMapping.AddFieldMappingsAt("id", exactStringMapping)
+	concMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	concMapping.AddFieldMappingsAt("created", dtMapping)
 	concMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	concMapping.AddFieldMappingsAt("is_simple_query", exactStringMapping)
@@ -55,6 +56,7 @@ func CreateMapping() (mapping.IndexMapping, error) {
 
 	wlistMapping := bleve.NewDocumentMapping()
 	wlistMapping.AddFieldMappingsAt("id", exactStringMapping)
+	wlistMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	wlistMapping.AddFieldMappingsAt("created", dtMapping)
 	wlistMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	wlistMapping.AddFieldMappingsAt("corpora", multiValMapping)
@@ -69,6 +71,7 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	// kwords type
 	kwordsMapping := bleve.NewDocumentMapping()
 	kwordsMapping.AddFieldMappingsAt("id", exactStringMapping)
+	kwordsMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	kwordsMapping.AddFieldMappingsAt("created", dtMapping)
 	kwordsMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	kwordsMapping.AddFieldMappingsAt("corpora", multiValMapping)
@@ -81,6 +84,7 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	// pquery type
 	pqueryMapping := bleve.NewDocumentMapping()
 	pqueryMapping.AddFieldMappingsAt("id", exactStringMapping)
+	pqueryMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	pqueryMapping.AddFieldMappingsAt("created", dtMapping)
 	pqueryMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	pqueryMapping.AddFieldMappingsAt("corpora", multiValMapping)
