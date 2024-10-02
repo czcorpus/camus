@@ -19,6 +19,7 @@ package documents
 import (
 	"camus/cncdb"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -35,7 +36,17 @@ type PQuery struct {
 
 	Subcorpus string `json:"subcorpus"`
 
-	RawQueries []cncdb.RawQuery `json:"rawQueries"`
+	RawQuery string `json:"raw_query"`
+
+	Structures string `json:"structures"`
+
+	StructAttrNames string `json:"struct_attr_names"`
+
+	StructAttrValues string `json:"struct_attr_values"`
+
+	PosAttrNames string `json:"pos_attr_names"`
+
+	PosAttrValues string `json:"pos_attr_values"`
 }
 
 func (pq *PQuery) Type() string {
@@ -117,11 +128,38 @@ func (doc *MidPQuery) GetQuerySupertype() cncdb.QuerySupertype {
 	return doc.QuerySupertype
 }
 
+func (doc *MidPQuery) getRawQueriesAsString() string {
+	var ans strings.Builder
+	for _, v := range doc.RawQueries {
+		ans.WriteString(" " + v.Value)
+	}
+	return ans.String()
+}
+
 func (doc *MidPQuery) AsIndexableDoc() IndexableDoc {
+	posAttrNames := make([]string, 0, 5)
+	posAttrValues := make([]string, 0, 5)
+	for name, values := range doc.PosAttrs {
+		posAttrNames = append(posAttrNames, name)
+		posAttrValues = append(posAttrValues, values...)
+	}
+
+	structAttrNames := make([]string, 0, 5)
+	structAttrValues := make([]string, 0, 5)
+	for name, values := range doc.StructAttrs {
+		structAttrNames = append(structAttrNames, name)
+		structAttrValues = append(structAttrValues, values...)
+	}
 	return &PQuery{
-		ID:             doc.ID,
-		QuerySupertype: string(doc.QuerySupertype),
-		Created:        doc.Created,
-		UserID:         strconv.Itoa(doc.UserID),
+		ID:               doc.ID,
+		QuerySupertype:   string(doc.QuerySupertype),
+		Created:          doc.Created,
+		UserID:           strconv.Itoa(doc.UserID),
+		RawQuery:         doc.getRawQueriesAsString(),
+		Structures:       strings.Join(doc.Structures, " "),
+		PosAttrNames:     strings.Join(posAttrNames, " "),
+		PosAttrValues:    strings.Join(posAttrValues, " "),
+		StructAttrNames:  strings.Join(structAttrNames, " "),
+		StructAttrValues: strings.Join(structAttrValues, " "),
 	}
 }

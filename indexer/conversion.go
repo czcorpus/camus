@@ -206,6 +206,7 @@ func importPquery(
 			return nil, fmt.Errorf("failed to process pquery conc #%d: not a conc. record", i)
 		}
 		conc, err := importConc(&crec, cqstype, &data, db)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to process pquery conc #%d: %w", i, err)
 		}
@@ -213,18 +214,14 @@ func importPquery(
 		if !ok {
 			panic("type assertion error when importing pquery concordance")
 		}
-		for _, rq := range tConc.RawQueries {
-			mergedRawQueries = append(mergedRawQueries, rq)
-		}
+		mergedRawQueries = append(mergedRawQueries, tConc.RawQueries...)
 		for paName, paValues := range tConc.PosAttrs {
 			mergedPosAttrs[paName] = append(mergedPosAttrs[paName], paValues...)
 		}
 		for saName, saValues := range tConc.StructAttrs {
 			mergedStructAttrs[saName] = append(mergedStructAttrs[saName], saValues...)
 		}
-		for _, sName := range tConc.Structures {
-			mergedStructures = append(mergedStructures, sName)
-		}
+		mergedStructures = append(mergedStructures, tConc.Structures...)
 
 	}
 	ans := &documents.MidPQuery{
@@ -236,6 +233,8 @@ func importPquery(
 		QuerySupertype: stype,
 		RawQueries:     mergedRawQueries,
 		PosAttrs:       mergedPosAttrs,
+		StructAttrs:    mergedStructAttrs,
+		Structures:     mergedStructures,
 	}
 	return ans, nil
 }

@@ -25,6 +25,7 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 )
 
@@ -70,6 +71,7 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 // filter, ...)
 func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
 	doc, err := RecToDoc(&rec, idx.db, idx.rdb)
+	spew.Dump(doc) // TODO remove debugging output
 	if err == ErrRecordNotIndexable {
 		return false, nil
 

@@ -21,8 +21,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 type Concordance struct {
@@ -179,6 +177,5 @@ func (doc *MidConc) AsIndexableDoc() IndexableDoc {
 		PosAttrNames:     strings.Join(posAttrNames, " "),
 		PosAttrValues:    strings.Join(posAttrValues, " "),
 	}
-	spew.Dump(bDoc)
 	return bDoc
 }
