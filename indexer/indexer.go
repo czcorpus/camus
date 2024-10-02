@@ -71,7 +71,6 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 // filter, ...)
 func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
 	doc, err := RecToDoc(&rec, idx.db, idx.rdb)
-	spew.Dump(doc) // TODO remove debugging output
 	if err == ErrRecordNotIndexable {
 		return false, nil
 
@@ -79,6 +78,7 @@ func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
 		return false, fmt.Errorf("failed to index record: %w", err)
 	}
 	docToIndex := doc.AsIndexableDoc()
+	spew.Dump(docToIndex) // TODO remove debugging output
 	err = idx.bleveIdx.Index(docToIndex.GetID(), docToIndex)
 	if err != nil {
 		return false, fmt.Errorf("failed to index record: %w", err)
@@ -129,7 +129,10 @@ func NewIndexer(
 ) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexDirPath)
 	if err == bleve.ErrorIndexMetaMissing || err == bleve.ErrorIndexPathDoesNotExist {
-		mapping := documents.CreateMapping()
+		mapping, err := documents.CreateMapping()
+		if err != nil {
+			return nil, err
+		}
 		bleveIdx, err = bleve.New(conf.IndexDirPath, mapping)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new index: %w", err)
