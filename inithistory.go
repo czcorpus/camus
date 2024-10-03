@@ -79,19 +79,19 @@ func (di *dataInitializer) run(
 	}
 
 	for i := 0; i < chunkSize; i++ {
-		nextone, err := di.rdb.UintZRemLowest(usersProcSetKey)
+		nextUserID, err := di.rdb.UintZRemLowest(usersProcSetKey)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to init query history")
 			os.Exit(4)
 			return
 		}
-		if nextone < 0 {
+		if nextUserID < 0 {
 			log.Info().Msg("no more items - ending")
 			break
 		}
-		qIDs, err := di.db.GetUserQueryHistory(conf.Indexer.KonTextHistoryTTL())
+		qIDs, err := di.db.GetUserQueryHistory(nextUserID, conf.Indexer.KonTextHistoryTTL())
 		log.Info().
-			Int("userId", nextone).
+			Int("userId", nextUserID).
 			Err(err).
 			Int("numRecords", len(qIDs)).Msg("processing next user")
 		if err != nil {
@@ -103,7 +103,7 @@ func (di *dataInitializer) run(
 			if err := di.processQuery(qID, ftIndexer); err != nil {
 				log.Error().
 					Err(err).
-					Int("userId", nextone).
+					Int("userId", nextUserID).
 					Str("queryId", qID).
 					Msg("failed to process record, skipping")
 			}

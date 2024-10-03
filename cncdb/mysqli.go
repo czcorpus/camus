@@ -45,5 +45,5 @@ type IMySQLOps interface {
 
 	GetAllUsersWithQueryHistory() ([]int, error)
 
-	GetUserQueryHistory(ttl time.Duration) ([]string, error)
+	GetUserQueryHistory(userID int, ttl time.Duration) ([]string, error)
 }

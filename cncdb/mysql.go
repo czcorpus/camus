@@ -246,12 +246,12 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetUserQueryHistory(ttl time.Duration) ([]string, error) {
+func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]string, error) {
 	oldestDate := time.Now().In(ops.tz).Add(-ttl)
 	rows, err := ops.db.Query(
 		"SELECT query_id FROM kontext_query_history "+
-			"WHERE name IS NOT NULL OR created >= ?",
-		oldestDate,
+			"WHERE user_id = ? AND (name IS NOT NULL OR created >= ?)",
+		userID, oldestDate,
 	)
 	if err != nil {
 		return []string{}, fmt.Errorf("failed to get user query history: %w", err)
