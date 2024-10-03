@@ -100,7 +100,14 @@ func (di *dataInitializer) run(
 			return
 		}
 		for _, qID := range qIDs {
-			di.processQuery(qID, ftIndexer)
+			if err := di.processQuery(qID, ftIndexer); err != nil {
+				log.Error().
+					Err(err).
+					Int("userId", nextone).
+					Str("queryId", qID).
+					Msg("failed to process record, skipping")
+			}
+
 		}
 	}
 }
