@@ -84,6 +84,11 @@ func (rd *RedisAdapter) UintZAdd(key string, v int) error {
 	return cmd.Err()
 }
 
+func (rd *RedisAdapter) ZCard(key string) (int, error) {
+	cmd := rd.redis.ZCard(rd.ctx, key)
+	return int(cmd.Val()), cmd.Err()
+}
+
 // IntZRemLowest removes and returns an element with lowest score from ZSET
 // returns true if the record was found and removed, otherwise false
 // (i.e. not finding the record is not an error)

@@ -110,4 +110,14 @@ func (di *dataInitializer) run(
 
 		}
 	}
+	remainingUsers, err := di.rdb.ZCard(usersProcSetKey)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to determine remaining num. of users to process")
+		os.Exit(6)
+		return
+	}
+	log.Info().
+		Int("remainingUsers", remainingUsers).
+		Int("chunkSize", chunkSize).
+		Msg("chunk processed")
 }
