@@ -203,7 +203,7 @@ func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
 	}, nil
 }
 
-func NewRedisAdapter(conf *RedisConf) *RedisAdapter {
+func NewRedisAdapter(ctx context.Context, conf *RedisConf) *RedisAdapter {
 	ans := &RedisAdapter{
 		conf: conf,
 		redis: redis.NewClient(&redis.Options{
@@ -211,7 +211,7 @@ func NewRedisAdapter(conf *RedisConf) *RedisAdapter {
 			Password: conf.Password,
 			DB:       conf.DB,
 		}),
-		ctx: context.Background(),
+		ctx: ctx,
 	}
 	return ans
 }

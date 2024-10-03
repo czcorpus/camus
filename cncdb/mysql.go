@@ -17,6 +17,7 @@
 package cncdb
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -69,8 +70,9 @@ func generateRows(sqlRows *sql.Rows, expectedSize int) ([]ArchRecord, error) {
 }
 
 type MySQLOps struct {
-	db *sql.DB
-	tz *time.Location
+	db  *sql.DB
+	tz  *time.Location
+	ctx context.Context
 }
 
 func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
@@ -81,7 +83,8 @@ func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	if num > maxRecentRecords {
 		panic(fmt.Sprintf("cannot load more than %d records at a time", maxRecentRecords))
 	}
-	rows, err := ops.db.Query(
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
 		"SELECT id, data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence "+
 			"WHERE created >= ? "+
@@ -93,7 +96,8 @@ func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 }
 
 func (ops *MySQLOps) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
-	rows, err := ops.db.Query(
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
 		"SELECT id, data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence "+
 			"WHERE created >= ? "+
@@ -105,8 +109,10 @@ func (ops *MySQLOps) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]Ar
 }
 
 func (ops *MySQLOps) ContainsRecord(concID string) (bool, error) {
-	row := ops.db.QueryRow("SELECT COUNT(*) FROM kontext_conc_persistence "+
-		"WHERE id = ? LIMIT 1", concID)
+	row := ops.db.QueryRowContext(
+		ops.ctx,
+		"SELECT COUNT(*) FROM kontext_conc_persistence "+
+			"WHERE id = ? LIMIT 1", concID)
 	if row.Err() != nil {
 		return false, fmt.Errorf("failed to test existence of record %s: %w", concID, row.Err())
 	}
@@ -116,7 +122,8 @@ func (ops *MySQLOps) ContainsRecord(concID string) (bool, error) {
 }
 
 func (ops *MySQLOps) LoadRecordsByID(concID string) ([]ArchRecord, error) {
-	rows, err := ops.db.Query(
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
 		"SELECT data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence WHERE id = ?", concID)
 	if err != nil {
@@ -137,7 +144,8 @@ func (ops *MySQLOps) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 }
 
 func (ops *MySQLOps) InsertRecord(rec ArchRecord) error {
-	_, err := ops.db.Exec(
+	_, err := ops.db.ExecContext(
+		ops.ctx,
 		"INSERT INTO kontext_conc_persistence (id, data, created, num_access, last_access, permanent) "+
 			"VALUES (?, ?, ?, ?, ?, ?)",
 		rec.ID, rec.Data, rec.Created, rec.NumAccess, rec.LastAccess, rec.Permanent,
@@ -149,7 +157,8 @@ func (ops *MySQLOps) InsertRecord(rec ArchRecord) error {
 }
 
 func (ops *MySQLOps) UpdateRecordStatus(id string, status int) error {
-	res, err := ops.db.Exec(
+	res, err := ops.db.ExecContext(
+		ops.ctx,
 		"UPDATE kontext_conc_persistence SET permanent = ? WHERE id = ?", status, id)
 	if err != nil {
 		return fmt.Errorf("failed to update status of %s: %w", id, err)
@@ -165,7 +174,8 @@ func (ops *MySQLOps) UpdateRecordStatus(id string, status int) error {
 }
 
 func (ops *MySQLOps) RemoveRecordsByID(concID string) error {
-	_, err := ops.db.Exec(
+	_, err := ops.db.ExecContext(
+		ops.ctx,
 		"DELETE FROM kontext_conc_persistence WHERE id = ?", concID)
 	if err != nil {
 		return fmt.Errorf("failed to remove records with id %s: %w", concID, err)
@@ -195,9 +205,10 @@ func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	if !forceLoad && !TimeIsAtNight(time.Now().In(ops.tz)) {
 		return [][2]int{}, ErrTooDemandingQuery
 	}
-	rows, err := ops.db.Query(
-		"SELECT COUNT(*), YEAR(created) AS yc " +
-			"FROM kontext_conc_persistence " +
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
+		"SELECT COUNT(*), YEAR(created) AS yc "+
+			"FROM kontext_conc_persistence "+
 			"GROUP BY YEAR(created) ORDER BY yc")
 	if err != nil {
 		return [][2]int{}, fmt.Errorf("failed to fetch arch. sizes: %w", err)
@@ -217,7 +228,8 @@ func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
 	if subcID == "" {
 		return "", nil
 	}
-	row := ops.db.QueryRow(
+	row := ops.db.QueryRowContext(
+		ops.ctx,
 		"SELECT name FROM kontext_subcorpus WHERE id = ?", subcID)
 	var name string
 	if err := row.Scan(&name); err != nil {
@@ -230,7 +242,10 @@ func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
 }
 
 func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
-	rows, err := ops.db.Query("SELECT DISTINCT user_id FROM kontext_query_history ORDER BY user_id")
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
+		"SELECT DISTINCT user_id FROM kontext_query_history ORDER BY user_id",
+	)
 	if err != nil {
 		return []int{}, fmt.Errorf("failed to get users with history: %w", err)
 	}
@@ -248,7 +263,8 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 
 func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]string, error) {
 	oldestDate := time.Now().In(ops.tz).Add(-ttl)
-	rows, err := ops.db.Query(
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
 		"SELECT query_id FROM kontext_query_history "+
 			"WHERE user_id = ? AND (name IS NOT NULL OR created >= ?)",
 		userID, oldestDate,
@@ -268,9 +284,10 @@ func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]strin
 	return ans, nil
 }
 
-func NewMySQLOps(db *sql.DB, tz *time.Location) *MySQLOps {
+func NewMySQLOps(ctx context.Context, db *sql.DB, tz *time.Location) *MySQLOps {
 	return &MySQLOps{
-		db: db,
-		tz: tz,
+		ctx: ctx,
+		db:  db,
+		tz:  tz,
 	}
 }

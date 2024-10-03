@@ -5,6 +5,7 @@ import (
 	"camus/cncdb"
 	"camus/cnf"
 	"camus/indexer"
+	"context"
 	"fmt"
 	"os"
 
@@ -48,6 +49,7 @@ func (di *dataInitializer) processQuery(queryID string, ftIndexer *indexer.Index
 }
 
 func (di *dataInitializer) run(
+	ctx context.Context,
 	conf *cnf.Conf,
 	chunkSize int,
 ) {
@@ -107,7 +109,18 @@ func (di *dataInitializer) run(
 					Str("queryId", qID).
 					Msg("failed to process record, skipping")
 			}
-
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("interrupted by user")
+				return
+			default:
+			}
+		}
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("interrupted by user")
+			return
+		default:
 		}
 	}
 	remainingUsers, err := di.rdb.ZCard(usersProcSetKey)

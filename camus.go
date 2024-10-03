@@ -125,15 +125,6 @@ func main() {
 	syscallChan := make(chan os.Signal, 1)
 	signal.Notify(syscallChan, os.Interrupt)
 	signal.Notify(syscallChan, syscall.SIGTERM)
-	exitEvent := make(chan os.Signal)
-	jobExitEvent := make(chan os.Signal)
-	go func() {
-		evt := <-syscallChan
-		exitEvent <- evt
-		jobExitEvent <- evt
-		close(exitEvent)
-		close(jobExitEvent)
-	}()
 
 	switch action {
 	case "start":
@@ -143,7 +134,11 @@ func main() {
 			os.Exit(1)
 			return
 		}
-		rdb := archiver.NewRedisAdapter(conf.Redis)
+
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		rdb := archiver.NewRedisAdapter(ctx, conf.Redis)
 
 		var reportingService reporting.IReporting
 		if conf.Reporting.Host != "" {
@@ -163,7 +158,7 @@ func main() {
 		}
 
 		var dbOps cncdb.IMySQLOps
-		dbOpsRaw := cncdb.NewMySQLOps(db, conf.TimezoneLocation())
+		dbOpsRaw := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
 		if *dryRun {
 			dbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
 
@@ -202,8 +197,6 @@ func main() {
 			idx:             ftIndexer,
 		}
 
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
 		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
@@ -238,6 +231,8 @@ func main() {
 			log.Warn().Msg("Shutdown timed out")
 		}
 	case "init-query-history":
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
 		db, err := cncdb.DBOpen(conf.MySQL)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to open SQL database")
@@ -245,10 +240,10 @@ func main() {
 			return
 		}
 		exec := dataInitializer{
-			db:  cncdb.NewMySQLOps(db, conf.TimezoneLocation()),
-			rdb: archiver.NewRedisAdapter(conf.Redis),
+			db:  cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
+			rdb: archiver.NewRedisAdapter(ctx, conf.Redis),
 		}
-		exec.run(conf, *initChunkSize)
+		exec.run(ctx, conf, *initChunkSize)
 
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)
