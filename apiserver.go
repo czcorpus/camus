@@ -49,6 +49,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(logging.GinMiddleware())
+	engine.Use(uniresp.AlwaysJSONContentType())
 	engine.NoMethod(uniresp.NoMethodHandler)
 	engine.NoRoute(uniresp.NotFoundHandler)
 
