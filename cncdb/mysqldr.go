@@ -73,6 +73,14 @@ func (ops *MySQLDryRun) GetSubcorpusName(subcID string) (string, error) {
 	return ops.db.GetSubcorpusName(subcID)
 }
 
+func (ops *MySQLDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
+	return ops.db.GetAllUsersWithQueryHistory()
+}
+
+func (ops *MySQLDryRun) GetUserQueryHistory(ttl time.Duration) ([]string, error) {
+	return ops.db.GetUserQueryHistory(ttl)
+}
+
 func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {
 	return &MySQLDryRun{db: ops}
 }

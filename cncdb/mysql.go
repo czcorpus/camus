@@ -229,6 +229,45 @@ func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
 	return name, nil
 }
 
+func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
+	rows, err := ops.db.Query("SELECT DISTINCT user_id FROM kontext_query_history ORDER BY user_id")
+	if err != nil {
+		return []int{}, fmt.Errorf("failed to get users with history: %w", err)
+	}
+	ans := make([]int, 0, 4000)
+	for rows.Next() {
+		var userID int
+		err := rows.Scan(&userID)
+		if err != nil {
+			return []int{}, fmt.Errorf("failed to get users with history: %w", err)
+		}
+		ans = append(ans, userID)
+	}
+	return ans, nil
+}
+
+func (ops *MySQLOps) GetUserQueryHistory(ttl time.Duration) ([]string, error) {
+	oldestDate := time.Now().In(ops.tz).Add(-ttl)
+	rows, err := ops.db.Query(
+		"SELECT query_id FROM kontext_query_history "+
+			"WHERE name IS NOT NULL OR created >= ?",
+		oldestDate,
+	)
+	if err != nil {
+		return []string{}, fmt.Errorf("failed to get user query history: %w", err)
+	}
+	ans := make([]string, 0, int(ttl.Hours()/24*10)) // cap: just a rough estimation
+	for rows.Next() {
+		var queryID string
+		err := rows.Scan(&queryID)
+		if err != nil {
+			return []string{}, fmt.Errorf("failed to get user query history: %w", err)
+		}
+		ans = append(ans, queryID)
+	}
+	return ans, nil
+}
+
 func NewMySQLOps(db *sql.DB, tz *time.Location) *MySQLOps {
 	return &MySQLOps{
 		db: db,

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -55,6 +56,14 @@ func (rd *RedisAdapter) Get(k string) (string, error) {
 	return cmd.Val(), nil
 }
 
+func (rd *RedisAdapter) Exists(key string) (bool, error) {
+	cmd := rd.redis.Exists(rd.ctx, key)
+	if cmd.Err() != nil {
+		return false, fmt.Errorf("failed to test key %s: %w", key, cmd.Err())
+	}
+	return cmd.Val() > 0, nil
+}
+
 func (rd *RedisAdapter) TriggerChan(chname, value string) error {
 	return rd.redis.Publish(rd.ctx, chname, value).Err()
 }
@@ -65,6 +74,42 @@ func (rd *RedisAdapter) Set(k string, v any) error {
 		return fmt.Errorf("failed to set Redis item %s: %w", k, cmd.Err())
 	}
 	return nil
+}
+
+func (rd *RedisAdapter) UintZAdd(key string, v int) error {
+	if v < 0 {
+		panic("UintZAdd - cannot add numbers < 0")
+	}
+	cmd := rd.redis.ZAdd(rd.ctx, key, redis.Z{Score: float64(v), Member: v})
+	return cmd.Err()
+}
+
+// IntZRemLowest removes and returns an element with lowest score from ZSET
+// returns true if the record was found and removed, otherwise false
+// (i.e. not finding the record is not an error)
+func (rd *RedisAdapter) UintZRemLowest(key string) (int, error) {
+	cmd := rd.redis.ZRange(rd.ctx, key, 0, 0)
+	if cmd.Err() == redis.Nil {
+		return -1, nil
+
+	} else if cmd.Err() != nil {
+		return -1, cmd.Err()
+	}
+	if len(cmd.Val()) == 0 {
+		return -1, nil
+
+	} else if len(cmd.Val()) > 1 {
+		return -1, fmt.Errorf("IntZRemLowest failed - more than one matching item")
+	}
+	vToRem, err := strconv.Atoi(cmd.Val()[0])
+	if err != nil {
+		return 0, fmt.Errorf("IntZRemLowest failed - item is not an integer")
+	}
+	cmd2 := rd.redis.ZRem(rd.ctx, key, vToRem)
+	if cmd2.Err() != nil {
+		err = fmt.Errorf("IntZRemLowest failed: %w", cmd2.Err())
+	}
+	return vToRem, err
 }
 
 // ChannelSubscribe subscribe to a Redis channel with a specified name.
@@ -136,6 +181,9 @@ func (rd *RedisAdapter) mkKey(id string) string {
 	return fmt.Sprintf("concordance:%s", id)
 }
 
+// GetConcRecord returns a concordance/wlist/pquery/kwords records
+// with a specified ID. In case no such record is found, ErrRecordNotFound
+// is returned.
 func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
 	ans := rd.redis.Get(rd.ctx, rd.mkKey(id))
 	if ans.Err() == redis.Nil {

@@ -26,6 +26,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -78,7 +79,9 @@ func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
 		return false, fmt.Errorf("failed to index record: %w", err)
 	}
 	docToIndex := doc.AsIndexableDoc()
-	spew.Dump(docToIndex) // TODO remove debugging output
+	if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+		spew.Dump(docToIndex)
+	}
 	err = idx.bleveIdx.Index(docToIndex.GetID(), docToIndex)
 	if err != nil {
 		return false, fmt.Errorf("failed to index record: %w", err)

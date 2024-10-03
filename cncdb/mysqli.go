@@ -42,4 +42,8 @@ type IMySQLOps interface {
 	// The method should accept empty value by responding
 	// with empty value (and without error).
 	GetSubcorpusName(subcID string) (string, error)
+
+	GetAllUsersWithQueryHistory() ([]int, error)
+
+	GetUserQueryHistory(ttl time.Duration) ([]string, error)
 }
