@@ -36,7 +36,7 @@ type CQLMidDoc interface {
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func ExtractCQLProps(doc CQLMidDoc) error {
+func ExtractCQLProps(doc CQLMidDoc, defaultAttr string) error {
 
 	for i, rq := range doc.GetRawQueries() {
 		if rq.Type != "advanced" {
@@ -56,7 +56,12 @@ func ExtractCQLProps(doc CQLMidDoc) error {
 				doc.AddStructure(cqlProp.Structure)
 
 			} else if cqlProp.IsPosattr() {
-				doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
+				if cqlProp.Name != "" {
+					doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
+
+				} else {
+					doc.AddPosAttr(defaultAttr, cqlProp.Value)
+				}
 			}
 		}
 	}

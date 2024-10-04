@@ -19,6 +19,7 @@ package cncdb
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -86,7 +87,20 @@ type pqueryForm struct {
 }
 
 type ConcFormRecord struct {
+	Q          []string `json:"q"`
 	LastopForm concForm `json:"lastop_form"`
+}
+
+func (cr *ConcFormRecord) GetDefaultAttr() string {
+	if len(cr.Q) == 0 || len(cr.Q[0]) == 0 {
+		return ""
+	}
+	tmp := cr.Q[0][1:] // [1:] is ok here (first char is always 1 byte)
+	chunks := strings.Split(tmp, ",")
+	if len(chunks) >= 2 {
+		return chunks[0]
+	}
+	return ""
 }
 
 type WlistFormRecord struct {

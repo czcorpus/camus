@@ -33,11 +33,25 @@ func TestExtractCQLProps(t *testing.T) {
 			},
 		},
 	}
-	err := ExtractCQLProps(&doc)
+	err := ExtractCQLProps(&doc, "")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"hi|hello", "p.*"}, doc.PosAttrs["word"])
 	assert.Equal(t, []string{"people"}, doc.PosAttrs["lemma"])
 	assert.Equal(t, []string{"N.*"}, doc.PosAttrs["tag"])
 	assert.Equal(t, []string{"text"}, doc.Structures)
 	assert.Equal(t, []string{"FIC: beletrie"}, doc.StructAttrs["text.txtypegroup"])
+}
+
+func TestExtractCQLPropsWithDefaultAttr(t *testing.T) {
+	doc := MidConc{
+		RawQueries: []cncdb.RawQuery{
+			{
+				Value: `"party"`,
+				Type:  "advanced",
+			},
+		},
+	}
+	err := ExtractCQLProps(&doc, "word")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"party"}, doc.PosAttrs["word"])
 }
