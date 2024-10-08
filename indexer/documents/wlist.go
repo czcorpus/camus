@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -50,7 +51,7 @@ func (wlist *Wordlist) Type() string {
 }
 
 func (wlist *Wordlist) GetID() string {
-	return wlist.ID
+	return fmt.Sprintf("%s-%d-%s", wlist.UserID, wlist.Created.Unix(), wlist.ID)
 }
 
 // intermediate word list data

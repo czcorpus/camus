@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -56,7 +57,7 @@ func (bdoc *Concordance) Type() string {
 }
 
 func (bdoc *Concordance) GetID() string {
-	return bdoc.ID
+	return fmt.Sprintf("%s-%d-%s", bdoc.UserID, bdoc.Created.Unix(), bdoc.ID)
 }
 
 // intermediate concordance

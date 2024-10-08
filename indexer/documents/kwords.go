@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -46,7 +47,7 @@ func (kw *Kwords) Type() string {
 }
 
 func (kw *Kwords) GetID() string {
-	return kw.ID
+	return fmt.Sprintf("%s-%d-%s", kw.UserID, kw.Created.Unix(), kw.ID)
 }
 
 // intermediate keywords record

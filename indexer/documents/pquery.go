@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -54,7 +55,7 @@ func (pq *PQuery) Type() string {
 }
 
 func (pq *PQuery) GetID() string {
-	return pq.ID
+	return fmt.Sprintf("%s-%d-%s", pq.UserID, pq.Created.Unix(), pq.ID)
 }
 
 // intermediate PQuery
