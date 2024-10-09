@@ -84,3 +84,16 @@ func (rec ArchRecord) FetchData() (GeneralDataRecord, error) {
 	}
 	return ans, nil
 }
+
+// ----------------------------------
+
+type HistoryRecord struct {
+	QueryID string `json:"query_id"`
+	UserID  int    `json:"user_id"`
+	Created int    `json:"created"`
+	Name    string `json:"name"`
+}
+
+func (qh *HistoryRecord) CreateIndexID() string {
+	return fmt.Sprintf("%d/%d/%s", qh.UserID, qh.Created, qh.QueryID)
+}

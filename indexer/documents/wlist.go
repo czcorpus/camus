@@ -27,6 +27,8 @@ import (
 type Wordlist struct {
 	ID string `json:"id"`
 
+	Name string `json:"name"`
+
 	Created time.Time `json:"created"`
 
 	QuerySupertype string `json:"query_supertype"`
@@ -51,7 +53,11 @@ func (wlist *Wordlist) Type() string {
 }
 
 func (wlist *Wordlist) GetID() string {
-	return fmt.Sprintf("%s-%d-%s", wlist.UserID, wlist.Created.Unix(), wlist.ID)
+	return fmt.Sprintf("%s/%d/%s", wlist.UserID, wlist.Created.Unix(), wlist.ID)
+}
+
+func (wlist *Wordlist) SetName(name string) {
+	wlist.Name = name
 }
 
 // intermediate word list data

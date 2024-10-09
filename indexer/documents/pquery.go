@@ -27,6 +27,8 @@ import (
 type PQuery struct {
 	ID string `json:"id"`
 
+	Name string `json:"name"`
+
 	Created time.Time `json:"created"`
 
 	QuerySupertype string `json:"query_supertype"`
@@ -55,7 +57,11 @@ func (pq *PQuery) Type() string {
 }
 
 func (pq *PQuery) GetID() string {
-	return fmt.Sprintf("%s-%d-%s", pq.UserID, pq.Created.Unix(), pq.ID)
+	return fmt.Sprintf("%s/%d/%s", pq.UserID, pq.Created.Unix(), pq.ID)
+}
+
+func (pq *PQuery) SetName(name string) {
+	pq.Name = name
 }
 
 // intermediate PQuery

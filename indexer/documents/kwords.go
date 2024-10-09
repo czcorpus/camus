@@ -27,6 +27,8 @@ import (
 type Kwords struct {
 	ID string `json:"id"`
 
+	Name string `json:"name"`
+
 	Created time.Time `json:"created"`
 
 	QuerySupertype string `json:"query_supertype"`
@@ -47,7 +49,11 @@ func (kw *Kwords) Type() string {
 }
 
 func (kw *Kwords) GetID() string {
-	return fmt.Sprintf("%s-%d-%s", kw.UserID, kw.Created.Unix(), kw.ID)
+	return fmt.Sprintf("%s/%d/%s", kw.UserID, kw.Created.Unix(), kw.ID)
+}
+
+func (kw *Kwords) SetName(name string) {
+	kw.Name = name
 }
 
 // intermediate keywords record

@@ -44,7 +44,7 @@ func (service *Service) Start(ctx context.Context) {
 				log.Info().Msg("about to close fulltext Service")
 				return
 			case msg := <-service.rmChan:
-				var item QueryHistoryIdent
+				var item cncdb.HistoryRecord
 				if err := json.Unmarshal([]byte(msg.Payload), &item); err != nil {
 					log.Error().Err(err).Msg("failed to unmarshal next fulltext remove item")
 					continue

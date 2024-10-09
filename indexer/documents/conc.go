@@ -27,6 +27,8 @@ import (
 type Concordance struct {
 	ID string `json:"id"`
 
+	Name string `json:"name"`
+
 	Created time.Time `json:"created"`
 
 	QuerySupertype string `json:"query_supertype"`
@@ -57,7 +59,11 @@ func (bdoc *Concordance) Type() string {
 }
 
 func (bdoc *Concordance) GetID() string {
-	return fmt.Sprintf("%s-%d-%s", bdoc.UserID, bdoc.Created.Unix(), bdoc.ID)
+	return fmt.Sprintf("%s/%d/%s", bdoc.UserID, bdoc.Created.Unix(), bdoc.ID)
+}
+
+func (bdoc *Concordance) SetName(name string) {
+	bdoc.Name = name
 }
 
 // intermediate concordance
