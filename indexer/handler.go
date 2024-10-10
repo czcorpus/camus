@@ -19,6 +19,7 @@ package indexer
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
@@ -67,13 +68,19 @@ func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
 }
 
 func (a *Actions) Search(ctx *gin.Context) {
-	rec, err := a.indexer.Search(ctx.Query("q"))
+	limit, err := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+	order := strings.Split(ctx.Query("order"), ",")
+	fields := strings.Split(ctx.Query("fields"), ",")
+	rec, err := a.indexer.Search(ctx.Query("q"), limit, order, fields)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, rec)
-
 }
 
 func NewActions(indexer *Indexer) *Actions {

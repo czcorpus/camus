@@ -104,12 +104,20 @@ func (idx *Indexer) Count() (uint64, error) {
 	return idx.bleveIdx.DocCount()
 }
 
-func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
+func (idx *Indexer) Search(q string, limit int, order []string, fields []string) (*bleve.SearchResult, error) {
 	query := bleve.NewQueryStringQuery(q)
 	search := bleve.NewSearchRequest(query)
-	search.SortBy([]string{"-_score", "-created"})
-	search.Fields = []string{"*"}
-	search.Size = 20 // TODO !!!
+	search.Size = limit
+	if len(order) > 0 {
+		search.SortBy(order)
+	} else {
+		search.SortBy([]string{"-_score", "-created"})
+	}
+	if len(fields) > 0 {
+		search.Fields = fields
+	} else {
+		search.Fields = []string{"*"}
+	}
 	return idx.bleveIdx.Search(search)
 }
 
