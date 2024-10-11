@@ -57,7 +57,7 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 			continue
 		} else if hRec.Rec != nil {
 			log.Debug().Any("item", hRec).Msg("about to store item to Bleve index")
-			indexed, err := idx.IndexRecord(hRec)
+			indexed, err := idx.IndexRecord(&hRec)
 			if !indexed && err == nil {
 				continue
 
@@ -77,8 +77,8 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 // as not all records we deal with are supported for indexing
 // (e.g. additional stages of concordance queries - like shuffle,
 // filter, ...)
-func (idx *Indexer) IndexRecord(hRec cncdb.HistoryRecord) (bool, error) {
-	doc, err := RecToDoc(&hRec, idx.db, idx.rdb)
+func (idx *Indexer) IndexRecord(hRec *cncdb.HistoryRecord) (bool, error) {
+	doc, err := RecToDoc(hRec, idx.db, idx.rdb)
 	if err == ErrRecordNotIndexable {
 		return false, nil
 
@@ -118,6 +118,19 @@ func (idx *Indexer) Search(q string, limit int, order []string, fields []string)
 	return idx.bleveIdx.Search(search)
 }
 
+func (idx *Indexer) Update(hRec *cncdb.HistoryRecord) error {
+	rec, err := idx.GetConcRecord(hRec.QueryID)
+	if err != nil {
+		return err
+	} else if rec == nil {
+		return fmt.Errorf("query not found: %s", hRec.QueryID)
+	}
+	hRec.Rec = rec
+	log.Debug().Any("item", hRec).Msg("about to store item to Bleve index")
+	_, err = idx.IndexRecord(hRec)
+	return err
+}
+
 func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.ArchRecord, error) {
 	rec, err := idx.rdb.GetConcRecord(queryID)
 	if err == cncdb.ErrRecordNotFound {
@@ -147,7 +160,7 @@ func (idx *Indexer) Start(ctx context.Context) {
 				log.Info().Msg("about to close ArchKeeper")
 				return
 			case hRec := <-idx.recsToIndex:
-				if _, err := idx.IndexRecord(hRec); err != nil {
+				if _, err := idx.IndexRecord(&hRec); err != nil {
 					log.Error().Err(err).Any("hRec", hRec).Msg("unable to index record")
 				}
 			}

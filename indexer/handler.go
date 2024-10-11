@@ -17,6 +17,8 @@
 package indexer
 
 import (
+	"camus/cncdb"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -87,6 +89,48 @@ func (a *Actions) Search(ctx *gin.Context) {
 		return
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, rec)
+}
+
+func (a *Actions) Update(ctx *gin.Context) {
+	queryID := ctx.Query("queryId")
+	if queryID == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing query ID"), http.StatusBadRequest)
+		return
+	}
+
+	userIDStr := ctx.Query("userId")
+	if userIDStr == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing user ID"), http.StatusBadRequest)
+		return
+	}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid user ID"), http.StatusBadRequest)
+		return
+	}
+
+	createdStr := ctx.Query("created")
+	if createdStr == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing `created` unix timestamp"), http.StatusBadRequest)
+		return
+	}
+	created, err := strconv.Atoi(createdStr)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid `created` unix timestamp"), http.StatusBadRequest)
+		return
+	}
+
+	hRec := cncdb.HistoryRecord{
+		QueryID: queryID,
+		UserID:  userID,
+		Created: int64(created),
+		Name:    ctx.Query("name"),
+	}
+	if err := a.indexer.Update(&hRec); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, hRec)
 }
 
 func NewActions(indexer *Indexer) *Actions {

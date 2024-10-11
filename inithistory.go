@@ -39,7 +39,7 @@ func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *ind
 		return fmt.Errorf("failed to process query %s: %w", hRec.QueryID, err)
 	}
 	hRec.Rec = &rec
-	ok, err := ftIndexer.IndexRecord(hRec)
+	ok, err := ftIndexer.IndexRecord(&hRec)
 	if err != nil {
 		return fmt.Errorf("failed to index query %s: %w", hRec.QueryID, err)
 	}
