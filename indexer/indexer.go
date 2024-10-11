@@ -131,6 +131,10 @@ func (idx *Indexer) Update(hRec *cncdb.HistoryRecord) error {
 	return err
 }
 
+func (idx *Indexer) Delete(hRec *cncdb.HistoryRecord) error {
+	return idx.bleveIdx.Delete(hRec.CreateIndexID())
+}
+
 func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.ArchRecord, error) {
 	rec, err := idx.rdb.GetConcRecord(queryID)
 	if err == cncdb.ErrRecordNotFound {

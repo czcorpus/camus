@@ -70,6 +70,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.GET("/indexer/build", indexerHandler.IndexLatestRecords)
 	engine.GET("/indexer/search", indexerHandler.Search)
 	engine.GET("/indexer/update", indexerHandler.Update)
+	engine.GET("/indexer/delete", indexerHandler.Delete)
 
 	api.server = &http.Server{
 		Handler:      engine,
