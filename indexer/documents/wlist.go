@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 
 type Wordlist struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	Created time.Time `json:"created"`
 
@@ -50,13 +53,15 @@ func (wlist *Wordlist) Type() string {
 }
 
 func (wlist *Wordlist) GetID() string {
-	return wlist.ID
+	return fmt.Sprintf("%s/%d/%s", wlist.UserID, wlist.Created.Unix(), wlist.ID)
 }
 
 // intermediate word list data
 
 type MidWordlist struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
@@ -91,6 +96,7 @@ func (mwl *MidWordlist) GetQuerySupertype() cncdb.QuerySupertype {
 func (mwl *MidWordlist) AsIndexableDoc() IndexableDoc {
 	return &Wordlist{
 		ID:             mwl.ID,
+		Name:           mwl.Name,
 		Created:        mwl.Created,
 		QuerySupertype: string(mwl.QuerySupertype),
 		UserID:         strconv.Itoa(mwl.UserID),

@@ -21,29 +21,30 @@ type dataInitializer struct {
 	rdb *archiver.RedisAdapter
 }
 
-func (di *dataInitializer) processQuery(queryID string, ftIndexer *indexer.Indexer) error {
-	rec, err := di.rdb.GetConcRecord(queryID)
+func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *indexer.Indexer) error {
+	rec, err := di.rdb.GetConcRecord(hRec.QueryID)
 	if err == cncdb.ErrRecordNotFound {
-		log.Info().Str("queryId", queryID).Msg("record not found in Redis, trying MySQL")
-		recs, err := di.db.LoadRecordsByID(queryID)
+		log.Info().Str("queryId", hRec.QueryID).Msg("record not found in Redis, trying MySQL")
+		recs, err := di.db.LoadRecordsByID(hRec.QueryID)
 		if err != nil {
-			return fmt.Errorf("failed to load query %s from MySQL: %w", queryID, err)
+			return fmt.Errorf("failed to load query %s from MySQL: %w", hRec.QueryID, err)
 		}
 		if len(recs) == 0 {
-			log.Warn().Str("queryId", queryID).Msg("record is gone - cannot process, ignoring")
+			log.Warn().Str("queryId", hRec.QueryID).Msg("record is gone - cannot process, ignoring")
 			return nil
 		}
 		rec = recs[0]
 
 	} else if err != nil {
-		return fmt.Errorf("failed to process query %s: %w", queryID, err)
+		return fmt.Errorf("failed to process query %s: %w", hRec.QueryID, err)
 	}
-	ok, err := ftIndexer.IndexRecord(rec)
+	hRec.Rec = &rec
+	ok, err := ftIndexer.IndexRecord(&hRec)
 	if err != nil {
-		return fmt.Errorf("failed to index query %s: %w", queryID, err)
+		return fmt.Errorf("failed to index query %s: %w", hRec.QueryID, err)
 	}
 	if !ok {
-		log.Warn().Str("queryId", queryID).Msg("record not indexable - skipped")
+		log.Warn().Str("queryId", hRec.QueryID).Msg("record not indexable - skipped")
 	}
 	return nil
 }
@@ -71,7 +72,7 @@ func (di *dataInitializer) run(
 			di.rdb.UintZAdd(usersProcSetKey, uid)
 		}
 	}
-	recsToIndex := make(chan cncdb.ArchRecord)
+	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
 	ftIndexer, err := indexer.NewIndexer(conf.Indexer, di.db, di.rdb, recsToIndex)
 	if err != nil {
@@ -101,12 +102,12 @@ func (di *dataInitializer) run(
 			os.Exit(5)
 			return
 		}
-		for _, qID := range qIDs {
-			if err := di.processQuery(qID, ftIndexer); err != nil {
+		for _, hRec := range qIDs {
+			if err := di.processQuery(hRec, ftIndexer); err != nil {
 				log.Error().
 					Err(err).
 					Int("userId", nextUserID).
-					Str("queryId", qID).
+					Str("queryId", hRec.QueryID).
 					Msg("failed to process record, skipping")
 			}
 			select {

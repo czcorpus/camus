@@ -38,7 +38,10 @@ type Actions struct {
 }
 
 func (a *Actions) RecordToDoc(ctx *gin.Context) {
-	rec, err := a.service.GetRecord(ctx.Query("id"))
+	hRec := cncdb.HistoryRecord{
+		QueryID: ctx.Query("id"),
+	}
+	rec, err := a.service.GetRecord(hRec.QueryID)
 	if err == cncdb.ErrRecordNotFound {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusNotFound)
 		return
@@ -47,7 +50,8 @@ func (a *Actions) RecordToDoc(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	doc, err := indexer.RecToDoc(&rec, a.db, a.rdb)
+	hRec.Rec = &rec
+	doc, err := indexer.RecToDoc(&hRec, a.db, a.rdb)
 	if err == indexer.ErrRecordNotIndexable {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusUnprocessableEntity)
 		return

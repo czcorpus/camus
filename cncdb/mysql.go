@@ -261,25 +261,60 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]string, error) {
+func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]HistoryRecord, error) {
 	oldestDate := time.Now().In(ops.tz).Add(-ttl)
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
-		"SELECT query_id FROM kontext_query_history "+
+		"SELECT query_id, created, name FROM kontext_query_history "+
 			"WHERE user_id = ? AND (name IS NOT NULL OR created >= ?)",
 		userID, oldestDate,
 	)
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to get user query history: %w", err)
+		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 	}
-	ans := make([]string, 0, int(ttl.Hours()/24*10)) // cap: just a rough estimation
+	ans := make([]HistoryRecord, 0, int(ttl.Hours()/24*10)) // cap: just a rough estimation
 	for rows.Next() {
-		var queryID string
-		err := rows.Scan(&queryID)
+		var hRec HistoryRecord
+		var name sql.NullString
+		err := rows.Scan(&hRec.QueryID, &hRec.Created, &name)
 		if err != nil {
-			return []string{}, fmt.Errorf("failed to get user query history: %w", err)
+			return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 		}
-		ans = append(ans, queryID)
+		hRec.Name = name.String
+		ans = append(ans, hRec)
+	}
+	return ans, nil
+}
+
+func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
+	// we use helperLimit to help partitioned table with millions of items
+	// to avoid going through all the partitions (or is the query planner
+	// able to determine it from `order by created DESC limit X` ?)
+	helperLimit := time.Now().In(ops.tz).Add(-180 * 24 * time.Hour)
+	if num > maxRecentRecords {
+		panic(fmt.Sprintf("cannot load more than %d records at a time", maxRecentRecords))
+	}
+
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
+		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
+			"WHERE created >= ? "+
+			"ORDER BY created DESC LIMIT ?",
+		helperLimit.Unix(), num,
+	)
+	if err != nil {
+		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
+	}
+	ans := make([]HistoryRecord, 0, num)
+	for rows.Next() {
+		var hRec HistoryRecord
+		var name sql.NullString
+		err := rows.Scan(&hRec.UserID, &hRec.QueryID, &hRec.Created, &name)
+		if err != nil {
+			return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
+		}
+		hRec.Name = name.String
+		ans = append(ans, hRec)
 	}
 	return ans, nil
 }

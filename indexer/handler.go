@@ -17,8 +17,11 @@
 package indexer
 
 import (
+	"camus/cncdb"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
@@ -67,13 +70,86 @@ func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
 }
 
 func (a *Actions) Search(ctx *gin.Context) {
-	rec, err := a.indexer.Search(ctx.Query("q"))
+	limit, err := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+	order := make([]string, 0, 3)
+	if orderParam := ctx.Query("order"); orderParam != "" {
+		order = append(order, strings.Split(orderParam, ",")...)
+	}
+	fields := make([]string, 0, 3)
+	if fieldsParam := ctx.Query("fields"); fieldsParam != "" {
+		fields = append(order, strings.Split(fieldsParam, ",")...)
+	}
+	rec, err := a.indexer.Search(ctx.Query("q"), limit, order, fields)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, rec)
+}
 
+func (a *Actions) Update(ctx *gin.Context) {
+	hRec := a.getHistoryRecord(ctx)
+	if hRec == nil {
+		return
+	}
+	hRec.Name = ctx.Query("name")
+	if err := a.indexer.Update(hRec); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, hRec)
+}
+
+func (a *Actions) Delete(ctx *gin.Context) {
+	hRec := a.getHistoryRecord(ctx)
+	if hRec == nil {
+		return
+	}
+	if err := a.indexer.Delete(hRec); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, hRec)
+}
+
+func (a *Actions) getHistoryRecord(ctx *gin.Context) *cncdb.HistoryRecord {
+	queryID := ctx.Query("queryId")
+	if queryID == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing query ID"), http.StatusBadRequest)
+		return nil
+	}
+
+	userIDStr := ctx.Query("userId")
+	if userIDStr == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing user ID"), http.StatusBadRequest)
+		return nil
+	}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid user ID"), http.StatusBadRequest)
+		return nil
+	}
+
+	createdStr := ctx.Query("created")
+	if createdStr == "" {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing `created` unix timestamp"), http.StatusBadRequest)
+		return nil
+	}
+	created, err := strconv.Atoi(createdStr)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid `created` unix timestamp"), http.StatusBadRequest)
+		return nil
+	}
+
+	return &cncdb.HistoryRecord{
+		QueryID: queryID,
+		UserID:  userID,
+		Created: int64(created),
+	}
 }
 
 func NewActions(indexer *Indexer) *Actions {

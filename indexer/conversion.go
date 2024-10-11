@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -51,12 +52,12 @@ type concDB interface {
 func importConc(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
-	arec *cncdb.ArchRecord,
+	hRec *cncdb.HistoryRecord,
 	db cncdb.IMySQLOps,
 ) (IndexableMidDoc, error) {
 
 	var form cncdb.ConcFormRecord
-	if err := json.Unmarshal([]byte(arec.Data), &form); err != nil {
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
 	subcName, err := rec.GetSubcorpus(db)
@@ -65,8 +66,9 @@ func importConc(
 	}
 	ans := &documents.MidConc{
 		ID:             rec.ID,
-		Created:        arec.Created,
-		UserID:         rec.UserID,
+		Name:           hRec.Name,
+		Created:        time.Unix(hRec.Created, 0),
+		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
 		Subcorpus:      subcName,
 		QuerySupertype: stype,
@@ -100,11 +102,11 @@ func importConc(
 func importWlist(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
-	arec *cncdb.ArchRecord,
+	hRec *cncdb.HistoryRecord,
 	db cncdb.IMySQLOps,
 ) (IndexableMidDoc, error) {
 	var form cncdb.WlistFormRecord
-	if err := json.Unmarshal([]byte(arec.Data), &form); err != nil {
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
 
@@ -114,9 +116,10 @@ func importWlist(
 	}
 	ans := &documents.MidWordlist{
 		ID:             rec.ID,
+		Name:           hRec.Name,
 		QuerySupertype: stype,
-		Created:        arec.Created,
-		UserID:         rec.UserID,
+		Created:        time.Unix(hRec.Created, 0),
+		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
 		Subcorpus:      subcName,
 		RawQuery:       form.Form.WLPattern,
@@ -130,11 +133,11 @@ func importWlist(
 func importKwords(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
-	arec *cncdb.ArchRecord,
+	hRec *cncdb.HistoryRecord,
 	db cncdb.IMySQLOps,
 ) (IndexableMidDoc, error) {
 	var form cncdb.KwordsFormRecord
-	if err := json.Unmarshal([]byte(arec.Data), &form); err != nil {
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
 
@@ -157,9 +160,10 @@ func importKwords(
 
 	ans := &documents.MidKwords{
 		ID:             rec.ID,
+		Name:           hRec.Name,
 		QuerySupertype: stype,
-		Created:        arec.Created,
-		UserID:         rec.UserID,
+		Created:        time.Unix(hRec.Created, 0),
+		UserID:         hRec.UserID,
 		Corpora:        corpora,
 		Subcorpora:     subcorpora,
 		RawQuery:       form.Form.WLPattern,
@@ -171,12 +175,12 @@ func importKwords(
 func importPquery(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
-	arec *cncdb.ArchRecord,
+	hRec *cncdb.HistoryRecord,
 	db cncdb.IMySQLOps,
 	cdb concDB,
 ) (IndexableMidDoc, error) {
 	var form cncdb.PQueryFormRecord
-	if err := json.Unmarshal([]byte(arec.Data), &form); err != nil {
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
 	subcName, err := rec.GetSubcorpus(db)
@@ -205,7 +209,14 @@ func importPquery(
 		if cqstype != cncdb.QuerySupertypeConc {
 			return nil, fmt.Errorf("failed to process pquery conc #%d: not a conc. record", i)
 		}
-		conc, err := importConc(&crec, cqstype, &data, db)
+		h := cncdb.HistoryRecord{
+			QueryID: hRec.QueryID,
+			UserID:  hRec.UserID,
+			Created: hRec.Created,
+			Name:    hRec.Name,
+			Rec:     &data,
+		}
+		conc, err := importConc(&crec, cqstype, &h, db)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to process pquery conc #%d: %w", i, err)
@@ -226,8 +237,9 @@ func importPquery(
 	}
 	ans := &documents.MidPQuery{
 		ID:             rec.ID,
-		Created:        arec.Created,
-		UserID:         rec.UserID,
+		Name:           hRec.Name,
+		Created:        time.Unix(hRec.Created, 0),
+		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
 		Subcorpus:      subcName,
 		QuerySupertype: stype,
@@ -242,9 +254,9 @@ func importPquery(
 // RecToDoc converts a conc/wlist/... archive record into an indexable
 // document. In case the record is OK but of an unsupported type (e.g. "shuffle"),
 // nil document is returned along with ErrRecordNotIndexable error.
-func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps, cdb concDB) (IndexableMidDoc, error) {
+func RecToDoc(hRec *cncdb.HistoryRecord, db cncdb.IMySQLOps, cdb concDB) (IndexableMidDoc, error) {
 	var rec cncdb.UntypedQueryRecord
-	if err := json.Unmarshal([]byte(arec.Data), &rec); err != nil {
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &rec); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
 	qstype, err := rec.GetSupertype()
@@ -257,13 +269,13 @@ func RecToDoc(arec *cncdb.ArchRecord, db cncdb.IMySQLOps, cdb concDB) (Indexable
 	var ans IndexableMidDoc
 	switch qstype {
 	case cncdb.QuerySupertypeConc:
-		ans, err = importConc(&rec, qstype, arec, db)
+		ans, err = importConc(&rec, qstype, hRec, db)
 	case cncdb.QuerySupertypeWlist:
-		ans, err = importWlist(&rec, qstype, arec, db)
+		ans, err = importWlist(&rec, qstype, hRec, db)
 	case cncdb.QuerySupertypeKwords:
-		ans, err = importKwords(&rec, qstype, arec, db)
+		ans, err = importKwords(&rec, qstype, hRec, db)
 	case cncdb.QuerySupertypePquery:
-		ans, err = importPquery(&rec, qstype, arec, db, cdb)
+		ans, err = importPquery(&rec, qstype, hRec, db, cdb)
 	default:
 		err = ErrRecordNotIndexable
 	}

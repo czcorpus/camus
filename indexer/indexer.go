@@ -35,7 +35,7 @@ type Indexer struct {
 	db          cncdb.IMySQLOps
 	rdb         *archiver.RedisAdapter
 	bleveIdx    bleve.Index
-	recsToIndex <-chan cncdb.ArchRecord
+	recsToIndex <-chan cncdb.HistoryRecord
 }
 
 // IndexRecentRecords takes latest `numLatest` records and
@@ -45,21 +45,28 @@ type Indexer struct {
 // - non error thing - e.g. sample, shuffle, filter,...),
 // such records are ignored.
 func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
-	results, err := idx.db.LoadRecentNRecords(numLatest)
+	history, err := idx.db.LoadRecentNHistory(numLatest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to index records: %w", err)
 	}
 	var numIndexed int
-	for _, rec := range results {
-		indexed, err := idx.IndexRecord(rec)
-		if !indexed && err == nil {
+	for _, hRec := range history {
+		hRec.Rec, err = idx.GetConcRecord(hRec.QueryID)
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to get record %s", hRec.QueryID)
 			continue
+		} else if hRec.Rec != nil {
+			log.Debug().Any("item", hRec).Msg("about to store item to Bleve index")
+			indexed, err := idx.IndexRecord(&hRec)
+			if !indexed && err == nil {
+				continue
 
-		} else if err != nil {
-			log.Error().Err(err).Any("rec", rec).Msg("invalid record, skipping")
-			continue
+			} else if err != nil {
+				log.Error().Err(err).Any("hRec", hRec).Msg("invalid record, skipping")
+				continue
+			}
+			numIndexed++
 		}
-		numIndexed++
 	}
 	return numIndexed, nil
 }
@@ -70,8 +77,8 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 // as not all records we deal with are supported for indexing
 // (e.g. additional stages of concordance queries - like shuffle,
 // filter, ...)
-func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
-	doc, err := RecToDoc(&rec, idx.db, idx.rdb)
+func (idx *Indexer) IndexRecord(hRec *cncdb.HistoryRecord) (bool, error) {
+	doc, err := RecToDoc(hRec, idx.db, idx.rdb)
 	if err == ErrRecordNotIndexable {
 		return false, nil
 
@@ -86,7 +93,7 @@ func (idx *Indexer) IndexRecord(rec cncdb.ArchRecord) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to index record: %w", err)
 	}
-	log.Debug().Str("id", rec.ID).Msg("indexed record")
+	log.Debug().Str("id", hRec.QueryID).Msg("indexed record")
 	return true, nil
 }
 
@@ -94,12 +101,58 @@ func (idx *Indexer) Count() (uint64, error) {
 	return idx.bleveIdx.DocCount()
 }
 
-func (idx *Indexer) Search(q string) (*bleve.SearchResult, error) {
+func (idx *Indexer) Search(q string, limit int, order []string, fields []string) (*bleve.SearchResult, error) {
 	query := bleve.NewQueryStringQuery(q)
 	search := bleve.NewSearchRequest(query)
-	search.Fields = []string{"*"}
-	search.Size = 20 // TODO !!!
+	search.Size = limit
+	if len(order) > 0 {
+		search.SortBy(order)
+	} else {
+		search.SortBy([]string{"-_score", "-created"})
+	}
+	if len(fields) > 0 {
+		search.Fields = fields
+	} else {
+		search.Fields = []string{"*"}
+	}
 	return idx.bleveIdx.Search(search)
+}
+
+func (idx *Indexer) Update(hRec *cncdb.HistoryRecord) error {
+	rec, err := idx.GetConcRecord(hRec.QueryID)
+	if err != nil {
+		return err
+	} else if rec == nil {
+		return fmt.Errorf("query not found: %s", hRec.QueryID)
+	}
+	hRec.Rec = rec
+	log.Debug().Any("item", hRec).Msg("about to store item to Bleve index")
+	_, err = idx.IndexRecord(hRec)
+	return err
+}
+
+func (idx *Indexer) Delete(hRec *cncdb.HistoryRecord) error {
+	return idx.bleveIdx.Delete(hRec.CreateIndexID())
+}
+
+func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.ArchRecord, error) {
+	rec, err := idx.rdb.GetConcRecord(queryID)
+	if err == cncdb.ErrRecordNotFound {
+		log.Info().Str("queryId", queryID).Msg("record not found in Redis, trying MySQL")
+		recs, err := idx.db.LoadRecordsByID(queryID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load query %s from MySQL: %w", queryID, err)
+		}
+		if len(recs) == 0 {
+			log.Warn().Str("queryId", queryID).Msg("record is gone - cannot process, ignoring")
+			return nil, nil
+		}
+		rec = recs[0]
+
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to process query %s: %w", queryID, err)
+	}
+	return &rec, nil
 }
 
 // Start initializes and runs Indexer
@@ -110,9 +163,9 @@ func (idx *Indexer) Start(ctx context.Context) {
 			case <-ctx.Done():
 				log.Info().Msg("about to close ArchKeeper")
 				return
-			case rec := <-idx.recsToIndex:
-				if _, err := idx.IndexRecord(rec); err != nil {
-					log.Error().Err(err).Any("rec", rec).Msg("unable to index record")
+			case hRec := <-idx.recsToIndex:
+				if _, err := idx.IndexRecord(&hRec); err != nil {
+					log.Error().Err(err).Any("hRec", hRec).Msg("unable to index record")
 				}
 			}
 		}
@@ -128,7 +181,7 @@ func NewIndexer(
 	conf *Conf,
 	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
-	recsToIndex <-chan cncdb.ArchRecord,
+	recsToIndex <-chan cncdb.HistoryRecord,
 ) (*Indexer, error) {
 	bleveIdx, err := bleve.Open(conf.IndexDirPath)
 	if err == bleve.ErrorIndexMetaMissing || err == bleve.ErrorIndexPathDoesNotExist {

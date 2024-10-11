@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 
 type Kwords struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	Created time.Time `json:"created"`
 
@@ -46,13 +49,15 @@ func (kw *Kwords) Type() string {
 }
 
 func (kw *Kwords) GetID() string {
-	return kw.ID
+	return fmt.Sprintf("%s/%d/%s", kw.UserID, kw.Created.Unix(), kw.ID)
 }
 
 // intermediate keywords record
 
 type MidKwords struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	Created time.Time `json:"created"`
 
@@ -80,6 +85,7 @@ func (mkw *MidKwords) GetQuerySupertype() cncdb.QuerySupertype {
 func (mkw *MidKwords) AsIndexableDoc() IndexableDoc {
 	return &Kwords{
 		ID:             mkw.ID,
+		Name:           mkw.Name,
 		Created:        mkw.Created,
 		QuerySupertype: string(mkw.QuerySupertype),
 		UserID:         strconv.Itoa(mkw.UserID),

@@ -18,6 +18,7 @@ package documents
 
 import (
 	"camus/cncdb"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 
 type Concordance struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	Created time.Time `json:"created"`
 
@@ -56,7 +59,7 @@ func (bdoc *Concordance) Type() string {
 }
 
 func (bdoc *Concordance) GetID() string {
-	return bdoc.ID
+	return fmt.Sprintf("%s/%d/%s", bdoc.UserID, bdoc.Created.Unix(), bdoc.ID)
 }
 
 // intermediate concordance
@@ -65,6 +68,8 @@ func (bdoc *Concordance) GetID() string {
 // fulltext indexing and search
 type MidConc struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
@@ -165,6 +170,7 @@ func (doc *MidConc) AsIndexableDoc() IndexableDoc {
 	}
 	bDoc := &Concordance{
 		ID:               doc.ID,
+		Name:             doc.Name,
 		Created:          doc.Created,
 		QuerySupertype:   string(doc.QuerySupertype),
 		UserID:           strconv.Itoa(doc.UserID),
