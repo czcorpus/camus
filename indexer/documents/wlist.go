@@ -56,14 +56,12 @@ func (wlist *Wordlist) GetID() string {
 	return fmt.Sprintf("%s/%d/%s", wlist.UserID, wlist.Created.Unix(), wlist.ID)
 }
 
-func (wlist *Wordlist) SetName(name string) {
-	wlist.Name = name
-}
-
 // intermediate word list data
 
 type MidWordlist struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
@@ -98,6 +96,7 @@ func (mwl *MidWordlist) GetQuerySupertype() cncdb.QuerySupertype {
 func (mwl *MidWordlist) AsIndexableDoc() IndexableDoc {
 	return &Wordlist{
 		ID:             mwl.ID,
+		Name:           mwl.Name,
 		Created:        mwl.Created,
 		QuerySupertype: string(mwl.QuerySupertype),
 		UserID:         strconv.Itoa(mwl.UserID),

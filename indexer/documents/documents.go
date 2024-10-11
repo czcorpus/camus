@@ -32,5 +32,4 @@ import "github.com/blevesearch/bleve/v2/mapping"
 type IndexableDoc interface {
 	mapping.Classifier
 	GetID() string
-	SetName(name string)
 }

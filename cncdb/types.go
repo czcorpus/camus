@@ -90,8 +90,9 @@ func (rec ArchRecord) FetchData() (GeneralDataRecord, error) {
 type HistoryRecord struct {
 	QueryID string `json:"query_id"`
 	UserID  int    `json:"user_id"`
-	Created int    `json:"created"`
+	Created int64  `json:"created"`
 	Name    string `json:"name"`
+	Rec     *ArchRecord
 }
 
 func (qh *HistoryRecord) CreateIndexID() string {

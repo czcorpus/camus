@@ -38,7 +38,8 @@ func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *ind
 	} else if err != nil {
 		return fmt.Errorf("failed to process query %s: %w", hRec.QueryID, err)
 	}
-	ok, err := ftIndexer.IndexRecord(rec, hRec.Name)
+	hRec.Rec = &rec
+	ok, err := ftIndexer.IndexRecord(hRec)
 	if err != nil {
 		return fmt.Errorf("failed to index query %s: %w", hRec.QueryID, err)
 	}
@@ -71,7 +72,7 @@ func (di *dataInitializer) run(
 			di.rdb.UintZAdd(usersProcSetKey, uid)
 		}
 	}
-	recsToIndex := make(chan cncdb.ArchRecord)
+	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
 	ftIndexer, err := indexer.NewIndexer(conf.Indexer, di.db, di.rdb, recsToIndex)
 	if err != nil {

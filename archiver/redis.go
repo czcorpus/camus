@@ -27,9 +27,32 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type QueueRecordType string
+
+const (
+	QRTypeArchive QueueRecordType = "archive"
+	QRTypeHistory QueueRecordType = "history"
+)
+
 type queueRecord struct {
-	Key      string `json:"key"`
-	Explicit bool   `json:"explicit"`
+	Type QueueRecordType `json:"type"`
+	Key  string          `json:"key"`
+
+	// query persistence data
+	Explicit bool `json:"explicit"`
+
+	// query history data
+	UserID  int    `json:"user_id"`
+	Created int64  `json:"created"`
+	Name    string `json:"name"`
+}
+
+func (qr queueRecord) IsArchive() bool {
+	return qr.Type == "archive"
+}
+
+func (qr queueRecord) IsHistory() bool {
+	return qr.Type == "history"
 }
 
 func (qr queueRecord) KeyCode() string {

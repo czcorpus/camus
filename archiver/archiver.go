@@ -50,7 +50,7 @@ type ArchKeeper struct {
 	dedup       *Deduplicator
 	tz          *time.Location
 	stats       reporting.OpStats
-	recsToIndex chan<- cncdb.ArchRecord
+	recsToIndex chan<- cncdb.HistoryRecord
 }
 
 // Start starts the ArchKeeper service
@@ -191,13 +191,24 @@ func (job *ArchKeeper) performCheck() error {
 			continue
 		}
 		rec.Created = time.Now().In(job.tz)
-		if item.Explicit {
-			job.handleExplicitReq(rec, item, &currStats)
 
-		} else {
-			job.handleImplicitReq(rec, item, &currStats)
+		switch item.Type {
+		case QRTypeArchive:
+			if item.Explicit {
+				job.handleExplicitReq(rec, item, &currStats)
+
+			} else {
+				job.handleImplicitReq(rec, item, &currStats)
+			}
+		case QRTypeHistory:
+			job.recsToIndex <- cncdb.HistoryRecord{
+				QueryID: item.Key,
+				UserID:  item.UserID,
+				Created: item.Created,
+				Name:    item.Name,
+				Rec:     &rec,
+			}
 		}
-		job.recsToIndex <- rec
 	}
 	log.Info().
 		Int("numInserted", currStats.NumInserted).
@@ -219,7 +230,7 @@ func NewArchKeeper(
 	redis *RedisAdapter,
 	db cncdb.IMySQLOps,
 	dedup *Deduplicator,
-	recsToIndex chan<- cncdb.ArchRecord,
+	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
 	tz *time.Location,
 	conf *Conf,

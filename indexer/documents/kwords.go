@@ -52,14 +52,12 @@ func (kw *Kwords) GetID() string {
 	return fmt.Sprintf("%s/%d/%s", kw.UserID, kw.Created.Unix(), kw.ID)
 }
 
-func (kw *Kwords) SetName(name string) {
-	kw.Name = name
-}
-
 // intermediate keywords record
 
 type MidKwords struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	Created time.Time `json:"created"`
 
@@ -87,6 +85,7 @@ func (mkw *MidKwords) GetQuerySupertype() cncdb.QuerySupertype {
 func (mkw *MidKwords) AsIndexableDoc() IndexableDoc {
 	return &Kwords{
 		ID:             mkw.ID,
+		Name:           mkw.Name,
 		Created:        mkw.Created,
 		QuerySupertype: string(mkw.QuerySupertype),
 		UserID:         strconv.Itoa(mkw.UserID),

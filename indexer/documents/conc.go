@@ -62,16 +62,14 @@ func (bdoc *Concordance) GetID() string {
 	return fmt.Sprintf("%s/%d/%s", bdoc.UserID, bdoc.Created.Unix(), bdoc.ID)
 }
 
-func (bdoc *Concordance) SetName(name string) {
-	bdoc.Name = name
-}
-
 // intermediate concordance
 
 // MidConc is a KonText conc. query representation intended for
 // fulltext indexing and search
 type MidConc struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
@@ -172,6 +170,7 @@ func (doc *MidConc) AsIndexableDoc() IndexableDoc {
 	}
 	bDoc := &Concordance{
 		ID:               doc.ID,
+		Name:             doc.Name,
 		Created:          doc.Created,
 		QuerySupertype:   string(doc.QuerySupertype),
 		UserID:           strconv.Itoa(doc.UserID),

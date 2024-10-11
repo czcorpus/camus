@@ -60,14 +60,12 @@ func (pq *PQuery) GetID() string {
 	return fmt.Sprintf("%s/%d/%s", pq.UserID, pq.Created.Unix(), pq.ID)
 }
 
-func (pq *PQuery) SetName(name string) {
-	pq.Name = name
-}
-
 // intermediate PQuery
 
 type MidPQuery struct {
 	ID string `json:"id"`
+
+	Name string `json:"name"`
 
 	QuerySupertype cncdb.QuerySupertype `json:"querySupertype"`
 
@@ -159,6 +157,7 @@ func (doc *MidPQuery) AsIndexableDoc() IndexableDoc {
 	}
 	return &PQuery{
 		ID:               doc.ID,
+		Name:             doc.Name,
 		QuerySupertype:   string(doc.QuerySupertype),
 		Created:          doc.Created,
 		UserID:           strconv.Itoa(doc.UserID),

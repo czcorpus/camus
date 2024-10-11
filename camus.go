@@ -59,7 +59,7 @@ type service interface {
 func createArchiver(
 	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
-	recsToIndex chan<- cncdb.ArchRecord,
+	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
 	conf *cnf.Conf,
 ) *archiver.ArchKeeper {
@@ -174,7 +174,7 @@ func main() {
 			cleanerDbOps = dbOps
 		}
 
-		recsToIndex := make(chan cncdb.ArchRecord)
+		recsToIndex := make(chan cncdb.HistoryRecord)
 
 		ftIndexer, err := indexer.NewIndexer(conf.Indexer, dbOps, rdb, recsToIndex)
 		if err != nil {

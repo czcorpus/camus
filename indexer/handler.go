@@ -73,8 +73,14 @@ func (a *Actions) Search(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
 		return
 	}
-	order := strings.Split(ctx.Query("order"), ",")
-	fields := strings.Split(ctx.Query("fields"), ",")
+	order := make([]string, 0, 3)
+	if orderParam := ctx.Query("order"); orderParam != "" {
+		order = append(order, strings.Split(orderParam, ",")...)
+	}
+	fields := make([]string, 0, 3)
+	if fieldsParam := ctx.Query("fields"); fieldsParam != "" {
+		fields = append(order, strings.Split(fieldsParam, ",")...)
+	}
 	rec, err := a.indexer.Search(ctx.Query("q"), limit, order, fields)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
