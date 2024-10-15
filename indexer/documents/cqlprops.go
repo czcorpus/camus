@@ -20,8 +20,10 @@ package documents
 import (
 	"camus/cncdb"
 	"fmt"
+	"reflect"
 
 	"github.com/czcorpus/cqlizer/cql"
+	"github.com/rs/zerolog/log"
 )
 
 type CQLMidDoc interface {
@@ -31,12 +33,63 @@ type CQLMidDoc interface {
 	GetRawQueries() []cncdb.RawQuery
 }
 
-// ExtractCQLProps parses queries stored in `doc` and
+// extractSimpleQueryProps decodes the convoluted JSON format KonText uses
+// to encode simple conc. queries.
+func extractSimpleQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
+	if form.LastopForm == nil || form.LastopForm.CurrParsedQueries == nil {
+		return nil
+	}
+	for _, queryRec := range form.LastopForm.CurrParsedQueries {
+		for _, conjRec := range queryRec {
+			tuple, ok := conjRec.([]any)
+			if !ok {
+				return fmt.Errorf("simple query proc error: failed to unpack conjuction record")
+
+			}
+			queryTokens, ok := tuple[0].([]any)
+			if !ok {
+				return fmt.Errorf(
+					"simple query proc error: failed to unpack properties part of a conjuction record item")
+			}
+			//    [  [lemma sublemma word] poklad  ]
+
+			for _, token := range queryTokens {
+				tokenPropsTmp, ok := token.([]any)
+				if !ok {
+					return fmt.Errorf("simple query proc error: failed to parse token props")
+				}
+				attrsTmp := tokenPropsTmp[0]
+				attrs, ok := attrsTmp.([]any)
+				if !ok {
+					return fmt.Errorf("simple query proc error: failed to determine attribute list")
+				}
+				valueTmp := tokenPropsTmp[1]
+				value, ok := valueTmp.(string)
+				if !ok {
+					return fmt.Errorf("simple query proc error: failed to determine query value")
+				}
+				for _, v := range attrs {
+					tv, ok := v.(string)
+					if !ok {
+						log.Warn().
+							Any("attrName", v).
+							Str("attrType", reflect.TypeOf(v).String()).
+							Msg("simple query proc warn: type assertion for an attribute name failed")
+					}
+					doc.AddPosAttr(tv, value)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// ExtractQueryProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func ExtractCQLProps(doc CQLMidDoc, defaultAttr string) error {
+func ExtractQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
 
 	for i, rq := range doc.GetRawQueries() {
 		if rq.Type != "advanced" {
@@ -60,10 +113,13 @@ func ExtractCQLProps(doc CQLMidDoc, defaultAttr string) error {
 					doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
 
 				} else {
-					doc.AddPosAttr(defaultAttr, cqlProp.Value)
+					doc.AddPosAttr(form.GetDefaultAttr(), cqlProp.Value)
 				}
 			}
 		}
+	}
+	if err := extractSimpleQueryProps(form, doc); err != nil {
+		return err
 	}
 	return nil
 }

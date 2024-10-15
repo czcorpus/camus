@@ -6,7 +6,7 @@ require (
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/blevesearch/bleve/v2 v2.4.2
 	github.com/czcorpus/cnc-gokit v0.10.1
-	github.com/czcorpus/cqlizer v0.0.10
+	github.com/czcorpus/cqlizer v0.0.11
 	github.com/czcorpus/hltscl v0.0.6
 	github.com/davecgh/go-spew v1.1.1
 	github.com/gin-gonic/gin v1.10.0

@@ -63,6 +63,10 @@ type concForm struct {
 	CurrQueryTypes    map[string]string   `json:"curr_query_types"`
 	CurrQueries       map[string]string   `json:"curr_queries"`
 	SelectedTextTypes map[string][]string `json:"selected_text_types"`
+
+	// CurrParsedQueries encodes KonText's TypeScript type:
+	// {[k:string]:Array<[Array<[string|Array<string>, string]>, boolean]>};
+	CurrParsedQueries map[string][]any `json:"curr_parsed_queries"`
 }
 
 type wlistForm struct {
@@ -87,8 +91,8 @@ type pqueryForm struct {
 }
 
 type ConcFormRecord struct {
-	Q          []string `json:"q"`
-	LastopForm concForm `json:"lastop_form"`
+	Q          []string  `json:"q"`
+	LastopForm *concForm `json:"lastop_form"`
 }
 
 func (cr *ConcFormRecord) GetDefaultAttr() string {

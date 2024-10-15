@@ -82,9 +82,10 @@ func importConc(
 		})
 	}
 
-	if err := documents.ExtractCQLProps(ans, form.GetDefaultAttr()); err != nil {
+	if err := documents.ExtractQueryProps(&form, ans); err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
+
 	if ans.StructAttrs == nil {
 		ans.StructAttrs = make(map[string][]string)
 	}
