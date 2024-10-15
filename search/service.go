@@ -24,13 +24,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/blevesearch/bleve/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
 type Service struct {
-	index      *bleve.Index
+	indexer    *indexer.Indexer
 	redis      *archiver.RedisAdapter
 	rmChanName string
 	rmChan     <-chan *redis.Message
@@ -49,9 +48,16 @@ func (service *Service) Start(ctx context.Context) {
 					log.Error().Err(err).Msg("failed to unmarshal next fulltext remove item")
 					continue
 				}
-				log.Debug().Any("item", item).Msg("about to remove item from Bleve index")
-				// TODO use Bleve here
-
+				log.Debug().
+					Str("id", item.CreateIndexID()).
+					Str("queryId", item.QueryID).
+					Msg("about to remove item from Bleve index")
+				if err := service.indexer.Delete(&item); err != nil {
+					log.Error().
+						Str("id", item.CreateIndexID()).
+						Str("queryId", item.QueryID).
+						Msg("failed to remove item from Bleve index")
+				}
 			}
 		}
 	}()
@@ -72,9 +78,11 @@ func (service *Service) TriggerNextRmItem() {
 
 func NewService(
 	conf *indexer.Conf,
+	indexer *indexer.Indexer,
 	redis *archiver.RedisAdapter,
 ) *Service {
 	return &Service{
+		indexer:    indexer,
 		redis:      redis,
 		rmChan:     redis.ChannelSubscribe(conf.DocRemoveChannel),
 		rmChanName: conf.DocRemoveChannel,

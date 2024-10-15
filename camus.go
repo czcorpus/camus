@@ -185,9 +185,10 @@ func main() {
 
 		arch := createArchiver(dbOps, rdb, recsToIndex, reportingService, conf)
 
-		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+		cln := cleaner.NewService(
+			cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
-		fulltext := search.NewService(conf.Indexer, rdb) // TODO attach to some filesystem location etc.
+		fulltext := search.NewService(conf.Indexer, ftIndexer, rdb)
 
 		as := &apiServer{
 			arch:            arch,
