@@ -15,12 +15,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package search
+package indexer
 
 import (
 	"camus/archiver"
 	"camus/cncdb"
-	"camus/indexer"
 	"context"
 	"encoding/json"
 
@@ -29,10 +28,14 @@ import (
 )
 
 type Service struct {
-	indexer    *indexer.Indexer
+	indexer    *Indexer
 	redis      *archiver.RedisAdapter
 	rmChanName string
 	rmChan     <-chan *redis.Message
+}
+
+func (service *Service) Indexer() *Indexer {
+	return service.indexer
 }
 
 func (service *Service) Start(ctx context.Context) {
@@ -45,14 +48,17 @@ func (service *Service) Start(ctx context.Context) {
 			case msg := <-service.rmChan:
 				var item cncdb.HistoryRecord
 				if err := json.Unmarshal([]byte(msg.Payload), &item); err != nil {
-					log.Error().Err(err).Msg("failed to unmarshal next fulltext remove item")
+					log.Error().
+						Err(err).
+						Str("origMessage", msg.Payload).
+						Msg("failed to unmarshal next fulltext remove item")
 					continue
 				}
 				log.Debug().
 					Str("id", item.CreateIndexID()).
 					Str("queryId", item.QueryID).
 					Msg("about to remove item from Bleve index")
-				if err := service.indexer.Delete(&item); err != nil {
+				if err := service.indexer.Delete(item.CreateIndexID()); err != nil {
 					log.Error().
 						Str("id", item.CreateIndexID()).
 						Str("queryId", item.QueryID).
@@ -72,13 +78,9 @@ func (service *Service) GetRecord(ident string) (cncdb.ArchRecord, error) {
 	return service.redis.GetConcRecord(ident)
 }
 
-func (service *Service) TriggerNextRmItem() {
-	service.redis.TriggerChan(service.rmChanName, "next")
-}
-
 func NewService(
-	conf *indexer.Conf,
-	indexer *indexer.Indexer,
+	conf *Conf,
+	indexer *Indexer,
 	redis *archiver.RedisAdapter,
 ) *Service {
 	return &Service{

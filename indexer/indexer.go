@@ -22,6 +22,7 @@ import (
 	"camus/cncdb"
 	"camus/indexer/documents"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2"
@@ -71,6 +72,37 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 	return numIndexed, nil
 }
 
+// RecToDoc converts a conc/wlist/... archive record into an indexable
+// document. In case the record is OK but of an unsupported type (e.g. "shuffle"),
+// nil document is returned along with ErrRecordNotIndexable error.
+func (idx *Indexer) RecToDoc(hRec *cncdb.HistoryRecord) (IndexableMidDoc, error) {
+	var rec cncdb.UntypedQueryRecord
+	if err := json.Unmarshal([]byte(hRec.Rec.Data), &rec); err != nil {
+		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
+	}
+	qstype, err := rec.GetSupertype()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
+	}
+	if !qstype.IsIndexable() {
+		return nil, ErrRecordNotIndexable
+	}
+	var ans IndexableMidDoc
+	switch qstype {
+	case cncdb.QuerySupertypeConc:
+		ans, err = importConc(&rec, qstype, hRec, idx.db)
+	case cncdb.QuerySupertypeWlist:
+		ans, err = importWlist(&rec, qstype, hRec, idx.db)
+	case cncdb.QuerySupertypeKwords:
+		ans, err = importKwords(&rec, qstype, hRec, idx.db)
+	case cncdb.QuerySupertypePquery:
+		ans, err = importPquery(&rec, qstype, hRec, idx.db, idx.rdb)
+	default:
+		err = ErrRecordNotIndexable
+	}
+	return ans, err
+}
+
 // IndexRecord indexes a provided archive record. The returned bool
 // specifies whether the record was indexed. It is perfectly OK if
 // a provided document is not indexed and without returned error
@@ -78,7 +110,7 @@ func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
 // (e.g. additional stages of concordance queries - like shuffle,
 // filter, ...)
 func (idx *Indexer) IndexRecord(hRec *cncdb.HistoryRecord) (bool, error) {
-	doc, err := RecToDoc(hRec, idx.db, idx.rdb)
+	doc, err := idx.RecToDoc(hRec)
 	if err == ErrRecordNotIndexable {
 		return false, nil
 
@@ -131,8 +163,8 @@ func (idx *Indexer) Update(hRec *cncdb.HistoryRecord) error {
 	return err
 }
 
-func (idx *Indexer) Delete(hRec *cncdb.HistoryRecord) error {
-	return idx.bleveIdx.Delete(hRec.CreateIndexID())
+func (idx *Indexer) Delete(recID string) error {
+	return idx.bleveIdx.Delete(recID)
 }
 
 func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.ArchRecord, error) {

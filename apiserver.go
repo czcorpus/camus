@@ -20,7 +20,6 @@ import (
 	"camus/archiver"
 	"camus/cnf"
 	"camus/indexer"
-	"camus/search"
 	"context"
 	"fmt"
 	"net/http"
@@ -36,9 +35,8 @@ type apiServer struct {
 	server          *http.Server
 	conf            *cnf.Conf
 	arch            *archiver.ArchKeeper
-	fulltextService *search.Service
+	fulltextService *indexer.Service
 	rdb             *archiver.RedisAdapter
-	idx             *indexer.Indexer
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -61,16 +59,12 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.POST("/fix/:id", archHandler.Fix)
 	engine.POST("/dedup-reset", archHandler.DedupReset)
 
-	fulltextHandler := search.NewActions(api.fulltextService, api.rdb)
-
-	engine.GET("/search/rec2doc", fulltextHandler.RecordToDoc)
-	engine.DELETE("/search/records", fulltextHandler.RemoveFromIndex)
-
-	indexerHandler := indexer.NewActions(api.idx)
-	engine.GET("/indexer/build", indexerHandler.IndexLatestRecords)
-	engine.GET("/indexer/search", indexerHandler.Search)
-	engine.GET("/indexer/update", indexerHandler.Update)
-	engine.GET("/indexer/delete", indexerHandler.Delete)
+	indexerHandler := indexer.NewActions(api.fulltextService)
+	engine.GET("/query-history/build", indexerHandler.IndexLatestRecords)
+	engine.GET("/query-history/rec2doc", indexerHandler.RecordToDoc)
+	engine.GET("/user-query-history/:userId", indexerHandler.Search)
+	engine.POST("/user-query-history/:userId/:queryId/:created", indexerHandler.Update)
+	engine.DELETE("/user-query-history/userId/:queryId/:created", indexerHandler.Delete)
 
 	api.server = &http.Server{
 		Handler:      engine,

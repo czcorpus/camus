@@ -23,7 +23,6 @@ import (
 	"camus/cnf"
 	"camus/indexer"
 	"camus/reporting"
-	"camus/search"
 	"context"
 	"flag"
 	"fmt"
@@ -188,14 +187,13 @@ func main() {
 		cln := cleaner.NewService(
 			cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
-		fulltext := search.NewService(conf.Indexer, ftIndexer, rdb)
+		fulltext := indexer.NewService(conf.Indexer, ftIndexer, rdb)
 
 		as := &apiServer{
 			arch:            arch,
 			conf:            conf,
 			fulltextService: fulltext,
 			rdb:             rdb,
-			idx:             ftIndexer,
 		}
 
 		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService}

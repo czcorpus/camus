@@ -251,35 +251,3 @@ func importPquery(
 	}
 	return ans, nil
 }
-
-// RecToDoc converts a conc/wlist/... archive record into an indexable
-// document. In case the record is OK but of an unsupported type (e.g. "shuffle"),
-// nil document is returned along with ErrRecordNotIndexable error.
-func RecToDoc(hRec *cncdb.HistoryRecord, db cncdb.IMySQLOps, cdb concDB) (IndexableMidDoc, error) {
-	var rec cncdb.UntypedQueryRecord
-	if err := json.Unmarshal([]byte(hRec.Rec.Data), &rec); err != nil {
-		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
-	}
-	qstype, err := rec.GetSupertype()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
-	}
-	if !qstype.IsIndexable() {
-		return nil, ErrRecordNotIndexable
-	}
-	var ans IndexableMidDoc
-	switch qstype {
-	case cncdb.QuerySupertypeConc:
-		ans, err = importConc(&rec, qstype, hRec, db)
-	case cncdb.QuerySupertypeWlist:
-		ans, err = importWlist(&rec, qstype, hRec, db)
-	case cncdb.QuerySupertypeKwords:
-		ans, err = importKwords(&rec, qstype, hRec, db)
-	case cncdb.QuerySupertypePquery:
-		ans, err = importPquery(&rec, qstype, hRec, db, cdb)
-	default:
-		err = ErrRecordNotIndexable
-	}
-	return ans, err
-
-}

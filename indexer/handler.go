@@ -32,7 +32,7 @@ const (
 )
 
 type Actions struct {
-	indexer *Indexer
+	idxService *Service
 }
 
 func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
@@ -52,12 +52,12 @@ func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
 		return
 	}
 
-	numProc, err := a.indexer.IndexRecentRecords(iNumRec)
+	numProc, err := a.idxService.Indexer().IndexRecentRecords(iNumRec)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
-	count, err := a.indexer.Count()
+	count, err := a.idxService.Indexer().Count()
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
@@ -67,6 +67,33 @@ func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
 		"numProcessed":   numProc,
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, resp)
+}
+
+func (a *Actions) RecordToDoc(ctx *gin.Context) {
+	hRec := cncdb.HistoryRecord{
+		QueryID: ctx.Query("id"),
+	}
+	rec, err := a.idxService.GetRecord(hRec.QueryID)
+	if err == cncdb.ErrRecordNotFound {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	hRec.Rec = &rec
+	doc, err := a.idxService.Indexer().RecToDoc(&hRec)
+	if err == ErrRecordNotIndexable {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusUnprocessableEntity)
+		return
+
+	} else if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, doc)
+
 }
 
 func (a *Actions) Search(ctx *gin.Context) {
@@ -83,7 +110,8 @@ func (a *Actions) Search(ctx *gin.Context) {
 	if fieldsParam := ctx.Query("fields"); fieldsParam != "" {
 		fields = append(order, strings.Split(fieldsParam, ",")...)
 	}
-	rec, err := a.indexer.Search(ctx.Query("q"), limit, order, fields)
+	srchQuery := fmt.Sprintf("+user_id:%s %s", ctx.Param("userId"), ctx.Query("q"))
+	rec, err := a.idxService.indexer.Search(srchQuery, limit, order, fields)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
@@ -97,7 +125,7 @@ func (a *Actions) Update(ctx *gin.Context) {
 		return
 	}
 	hRec.Name = ctx.Query("name")
-	if err := a.indexer.Update(hRec); err != nil {
+	if err := a.idxService.Indexer().Update(hRec); err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
@@ -109,7 +137,7 @@ func (a *Actions) Delete(ctx *gin.Context) {
 	if hRec == nil {
 		return
 	}
-	if err := a.indexer.Delete(hRec); err != nil {
+	if err := a.idxService.Indexer().Delete(hRec.CreateIndexID()); err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
 	}
@@ -117,28 +145,14 @@ func (a *Actions) Delete(ctx *gin.Context) {
 }
 
 func (a *Actions) getHistoryRecord(ctx *gin.Context) *cncdb.HistoryRecord {
-	queryID := ctx.Query("queryId")
-	if queryID == "" {
-		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing query ID"), http.StatusBadRequest)
-		return nil
-	}
-
-	userIDStr := ctx.Query("userId")
-	if userIDStr == "" {
-		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing user ID"), http.StatusBadRequest)
-		return nil
-	}
+	queryID := ctx.Param("queryId")
+	userIDStr := ctx.Param("userId")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid user ID"), http.StatusBadRequest)
 		return nil
 	}
-
-	createdStr := ctx.Query("created")
-	if createdStr == "" {
-		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("missing `created` unix timestamp"), http.StatusBadRequest)
-		return nil
-	}
+	createdStr := ctx.Param("created")
 	created, err := strconv.Atoi(createdStr)
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, fmt.Errorf("invalid `created` unix timestamp"), http.StatusBadRequest)
@@ -152,6 +166,8 @@ func (a *Actions) getHistoryRecord(ctx *gin.Context) *cncdb.HistoryRecord {
 	}
 }
 
-func NewActions(indexer *Indexer) *Actions {
-	return &Actions{indexer: indexer}
+func NewActions(idxService *Service) *Actions {
+	return &Actions{
+		idxService: idxService,
+	}
 }
