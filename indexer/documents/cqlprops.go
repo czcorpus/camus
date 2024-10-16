@@ -61,7 +61,11 @@ func extractSimpleQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
 				attrsTmp := tokenPropsTmp[0]
 				attrs, ok := attrsTmp.([]any)
 				if !ok {
-					return fmt.Errorf("simple query proc error: failed to determine attribute list")
+					singleAttr, ok := attrsTmp.(string)
+					if !ok {
+						return fmt.Errorf("simple query proc error: failed to determine attribute list or a single attribute")
+					}
+					attrs = []any{singleAttr}
 				}
 				valueTmp := tokenPropsTmp[1]
 				value, ok := valueTmp.(string)
