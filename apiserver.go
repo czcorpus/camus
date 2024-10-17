@@ -64,7 +64,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.GET("/query-history/rec2doc", indexerHandler.RecordToDoc)
 	engine.GET("/user-query-history/:userId", indexerHandler.Search)
 	engine.POST("/user-query-history/:userId/:queryId/:created", indexerHandler.Update)
-	engine.DELETE("/user-query-history/userId/:queryId/:created", indexerHandler.Delete)
+	engine.DELETE("/user-query-history/:userId/:queryId/:created", indexerHandler.Delete)
 
 	api.server = &http.Server{
 		Handler:      engine,
