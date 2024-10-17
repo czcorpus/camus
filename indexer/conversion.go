@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -83,7 +85,13 @@ func importConc(
 	}
 
 	if err := documents.ExtractQueryProps(&form, ans); err != nil {
-		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
+		rqs := make([]string, len(ans.GetRawQueries()))
+		for i, rq := range ans.GetRawQueries() {
+			rqs[i] = rq.Value
+		}
+		log.Warn().
+			Strs("queries", rqs).
+			Msg("indexing record with unparseable CQL query")
 	}
 
 	if ans.StructAttrs == nil {

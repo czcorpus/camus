@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/blevesearch/bleve/v2 v2.4.2
-	github.com/czcorpus/cnc-gokit v0.10.1
+	github.com/czcorpus/cnc-gokit v0.10.2
 	github.com/czcorpus/cqlizer v0.0.11
 	github.com/czcorpus/hltscl v0.0.6
 	github.com/davecgh/go-spew v1.1.1
@@ -15,7 +15,6 @@ require (
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/rs/zerolog v1.33.0
 	github.com/stretchr/testify v1.9.0
-
 )
 
 require (

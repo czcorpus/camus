@@ -112,6 +112,7 @@ func (a *Actions) Search(ctx *gin.Context) {
 	}
 	srchQuery := fmt.Sprintf("+user_id:%s %s", ctx.Param("userId"), ctx.Query("q"))
 	rec, err := a.idxService.indexer.Search(srchQuery, limit, order, fields)
+
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
 		return
