@@ -110,8 +110,45 @@ func (a *Actions) Search(ctx *gin.Context) {
 	if fieldsParam := ctx.Query("fields"); fieldsParam != "" {
 		fields = append(order, strings.Split(fieldsParam, ",")...)
 	}
+
+	var queryData []searchedTerm
+	if err := ctx.BindJSON(&queryData); err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+	queryData = append(
+		queryData,
+		searchedTerm{
+			Field:       "user_id",
+			Value:       ctx.Param("userId"),
+			Requirement: "must",
+		},
+	)
+	rec, err := a.idxService.indexer.Search(queryData, limit, order, fields)
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, rec)
+}
+
+func (a *Actions) SearchWithQuery(ctx *gin.Context) {
+	limit, err := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
+		return
+	}
+	order := make([]string, 0, 3)
+	if orderParam := ctx.Query("order"); orderParam != "" {
+		order = append(order, strings.Split(orderParam, ",")...)
+	}
+	fields := make([]string, 0, 3)
+	if fieldsParam := ctx.Query("fields"); fieldsParam != "" {
+		fields = append(order, strings.Split(fieldsParam, ",")...)
+	}
+
 	srchQuery := fmt.Sprintf("+user_id:%s %s", ctx.Param("userId"), ctx.Query("q"))
-	rec, err := a.idxService.indexer.Search(srchQuery, limit, order, fields)
+	rec, err := a.idxService.indexer.SearchWithQuery(srchQuery, limit, order, fields)
 
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)

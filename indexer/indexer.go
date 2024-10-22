@@ -26,10 +26,20 @@ import (
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/search/query"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
+
+type requirement string
+
+type searchedTerm struct {
+	Field       string      `json:"field"`
+	Value       string      `json:"value"`
+	Requirement requirement `json:"requirement"`
+	IsWildcard  bool        `json:"isWildCard"`
+}
 
 type Indexer struct {
 	conf        *Conf
@@ -133,9 +143,52 @@ func (idx *Indexer) Count() (uint64, error) {
 	return idx.bleveIdx.DocCount()
 }
 
-func (idx *Indexer) Search(q string, limit int, order []string, fields []string) (*bleve.SearchResult, error) {
+// SearchWithQuery is intended for human interface as it exposes Bleve's
+// query language (stuff like `author: "Doe" +type: fiction -subtype: romance`)
+func (idx *Indexer) SearchWithQuery(q string, limit int, order []string, fields []string) (*bleve.SearchResult, error) {
 	query := bleve.NewQueryStringQuery(q)
 	search := bleve.NewSearchRequest(query)
+	search.Size = limit
+	if len(order) > 0 {
+		search.SortBy(order)
+	} else {
+		search.SortBy([]string{"-_score", "-created"})
+	}
+	if len(fields) > 0 {
+		search.Fields = fields
+	} else {
+		search.Fields = []string{"*"}
+	}
+	return idx.bleveIdx.Search(search)
+}
+
+// Search provides a search interface for other applications
+func (idx *Indexer) Search(terms []searchedTerm, limit int, order []string, fields []string) (*bleve.SearchResult, error) {
+	boolQuery := bleve.NewBooleanQuery()
+	for _, term := range terms {
+		var addQueryFn func(m ...query.Query)
+		switch term.Requirement {
+		case "must":
+			addQueryFn = boolQuery.AddMust
+		case "must-not":
+			addQueryFn = boolQuery.AddMustNot
+		case "should":
+			addQueryFn = boolQuery.AddShould
+		default:
+			return nil, fmt.Errorf("unexpected query object requirement: \"%s\"", term.Requirement)
+		}
+		if term.IsWildcard {
+			wc := bleve.NewWildcardQuery(term.Value)
+			wc.SetField(term.Field)
+			addQueryFn(wc)
+
+		} else {
+			wc := bleve.NewMatchQuery(term.Value)
+			wc.SetField(term.Field)
+			addQueryFn(wc)
+		}
+	}
+	search := bleve.NewSearchRequest(boolQuery)
 	search.Size = limit
 	if len(order) > 0 {
 		search.SortBy(order)
