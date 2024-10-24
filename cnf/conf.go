@@ -20,6 +20,7 @@ import (
 	"camus/archiver"
 	"camus/cleaner"
 	"camus/cncdb"
+	"camus/indexer"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,6 +53,7 @@ type Conf struct {
 	Redis                  *archiver.RedisConf `json:"redis"`
 	MySQL                  *cncdb.DBConf       `json:"db"`
 	Archiver               *archiver.Conf      `json:"archiver"`
+	Indexer                *indexer.Conf       `json:"indexer"`
 	Cleaner                cleaner.Conf        `json:"cleaner"`
 	Reporting              hltscl.PgConf       `json:"reporting"`
 }
@@ -115,4 +117,7 @@ func ValidateAndDefaults(conf *Conf) {
 		log.Fatal().Err(err).Msg("invalid Clean configuration")
 	}
 
+	if err := conf.Indexer.ValidateAndDefaults(); err != nil {
+		log.Fatal().Err(err).Msg("invalid indexer configuration")
+	}
 }

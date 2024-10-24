@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bits-and-blooms/bloom"
+	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/czcorpus/cnc-gokit/fs"
 	"github.com/rs/zerolog/log"
 )

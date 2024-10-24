@@ -19,6 +19,7 @@ package main
 import (
 	"camus/archiver"
 	"camus/cnf"
+	"camus/indexer"
 	"context"
 	"fmt"
 	"net/http"
@@ -31,9 +32,11 @@ import (
 )
 
 type apiServer struct {
-	server *http.Server
-	conf   *cnf.Conf
-	arch   *archiver.ArchKeeper
+	server          *http.Server
+	conf            *cnf.Conf
+	arch            *archiver.ArchKeeper
+	fulltextService *indexer.Service
+	rdb             *archiver.RedisAdapter
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -44,16 +47,24 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 	engine.Use(logging.GinMiddleware())
+	engine.Use(uniresp.AlwaysJSONContentType())
 	engine.NoMethod(uniresp.NoMethodHandler)
 	engine.NoRoute(uniresp.NotFoundHandler)
 
-	handler := Actions{ArchKeeper: api.arch}
+	archHandler := Actions{ArchKeeper: api.arch}
 
-	engine.GET("/overview", handler.Overview)
-	engine.GET("/record/:id", handler.GetRecord)
-	engine.GET("/validate/:id", handler.Validate)
-	engine.POST("/fix/:id", handler.Fix)
-	engine.POST("/dedup-reset", handler.DedupReset)
+	engine.GET("/overview", archHandler.Overview)
+	engine.GET("/record/:id", archHandler.GetRecord)
+	engine.GET("/validate/:id", archHandler.Validate)
+	engine.POST("/fix/:id", archHandler.Fix)
+	engine.POST("/dedup-reset", archHandler.DedupReset)
+
+	indexerHandler := indexer.NewActions(api.fulltextService)
+	engine.GET("/query-history/build", indexerHandler.IndexLatestRecords)
+	engine.GET("/query-history/rec2doc", indexerHandler.RecordToDoc)
+	engine.POST("/user-query-history/:userId", indexerHandler.Search)
+	engine.POST("/user-query-history/:userId/:queryId/:created", indexerHandler.Update)
+	engine.DELETE("/user-query-history/:userId/:queryId/:created", indexerHandler.Delete)
 
 	api.server = &http.Server{
 		Handler:      engine,

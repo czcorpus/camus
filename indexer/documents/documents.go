@@ -14,22 +14,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package archiver
+package documents
 
-import (
-	"fmt"
-)
+import "github.com/blevesearch/bleve/v2/mapping"
 
-type RedisConf struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	DB       int    `json:"db"`
-	Password string `json:"password"`
-}
-
-func (conf *RedisConf) ValidateAndDefaults() error {
-	if conf.DB == 0 {
-		return fmt.Errorf("missing Redis configuration: `db`")
-	}
-	return nil
+// IndexableDoc is a generalization of a document
+// which can be added to a Bleve index. Please note
+// that Bleve uses reflection to get all the values
+// and that we rely on some hidden assumptions
+// in the sense that all the required
+// attributes are interpretable as expected.
+// We recommend providing mostly flat string
+// attributes even for structured original data
+// (e.g. []string => string_of_ws_separated_values,
+// map[string]string => string_of_ws_separated_keys,
+// string_of_ws_separated_values etc.)
+type IndexableDoc interface {
+	mapping.Classifier
+	GetID() string
 }

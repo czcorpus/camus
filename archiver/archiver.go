@@ -43,13 +43,14 @@ import (
 // to prevent (at least some) recent duplicates so that the database
 // is reasonably large.
 type ArchKeeper struct {
-	redis     *RedisAdapter
-	db        cncdb.IMySQLOps
-	reporting reporting.IReporting
-	conf      *Conf
-	dedup     *Deduplicator
-	tz        *time.Location
-	stats     reporting.OpStats
+	redis       *RedisAdapter
+	db          cncdb.IMySQLOps
+	reporting   reporting.IReporting
+	conf        *Conf
+	dedup       *Deduplicator
+	tz          *time.Location
+	stats       reporting.OpStats
+	recsToIndex chan<- cncdb.HistoryRecord
 }
 
 // Start starts the ArchKeeper service
@@ -71,6 +72,7 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 // Stop stops the ArchKeeper service
 func (job *ArchKeeper) Stop(ctx context.Context) error {
 	log.Warn().Msg("stopping ArchKeeper")
+	close(job.recsToIndex)
 	if err := job.dedup.OnClose(); err != nil {
 		return fmt.Errorf("failed to stop ArchKeeper properly: %w", err)
 	}
@@ -99,6 +101,8 @@ func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error
 	return job.db.LoadRecordsByID(concID)
 }
 
+// handleImplicitReq returns true if everything was ok, otherwise
+// false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(
 	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
 
@@ -108,7 +112,7 @@ func (job *ArchKeeper) handleImplicitReq(
 			Err(err).
 			Str("recordId", item.Key).
 			Msg("failed to insert record, skipping")
-		if err := job.redis.AddError(item, &rec); err != nil {
+		if err := job.redis.AddError(job.conf.FailedQueueKey, item, &rec); err != nil {
 			log.Error().Err(err).Msg("failed to insert error key")
 		}
 		currStats.NumErrors++
@@ -126,7 +130,7 @@ func (job *ArchKeeper) handleImplicitReq(
 			Err(err).
 			Str("recordId", item.Key).
 			Msg("failed to insert record, skipping")
-		if err := job.redis.AddError(item, &rec); err != nil {
+		if err := job.redis.AddError(job.conf.FailedQueueKey, item, &rec); err != nil {
 			log.Error().Err(err).Msg("failed to insert error key")
 		}
 	}
@@ -162,7 +166,7 @@ func (job *ArchKeeper) handleExplicitReq(
 }
 
 func (job *ArchKeeper) performCheck() error {
-	items, err := job.redis.NextNItems(int64(job.conf.CheckIntervalChunk))
+	items, err := job.redis.NextNArchItems(job.conf.QueueKey, int64(job.conf.CheckIntervalChunk))
 	log.Debug().
 		AnErr("error", err).
 		Int("itemsToProcess", len(items)).
@@ -180,18 +184,30 @@ func (job *ArchKeeper) performCheck() error {
 				Err(err).
 				Str("recordId", item.Key).
 				Msg("failed to get record from Redis, skipping")
-			if err := job.redis.AddError(item, nil); err != nil {
+			if err := job.redis.AddError(job.conf.FailedQueueKey, item, nil); err != nil {
 				log.Error().Err(err).Msg("failed to insert error key")
 			}
 			currStats.NumErrors++
 			continue
 		}
 		rec.Created = time.Now().In(job.tz)
-		if item.Explicit {
-			job.handleExplicitReq(rec, item, &currStats)
 
-		} else {
-			job.handleImplicitReq(rec, item, &currStats)
+		switch item.Type {
+		case QRTypeArchive:
+			if item.Explicit {
+				job.handleExplicitReq(rec, item, &currStats)
+
+			} else {
+				job.handleImplicitReq(rec, item, &currStats)
+			}
+		case QRTypeHistory:
+			job.recsToIndex <- cncdb.HistoryRecord{
+				QueryID: item.Key,
+				UserID:  item.UserID,
+				Created: item.Created,
+				Name:    item.Name,
+				Rec:     &rec,
+			}
 		}
 	}
 	log.Info().
@@ -214,16 +230,18 @@ func NewArchKeeper(
 	redis *RedisAdapter,
 	db cncdb.IMySQLOps,
 	dedup *Deduplicator,
+	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
 	tz *time.Location,
 	conf *Conf,
 ) *ArchKeeper {
 	return &ArchKeeper{
-		redis:     redis,
-		db:        db,
-		dedup:     dedup,
-		reporting: reporting,
-		tz:        tz,
-		conf:      conf,
+		redis:       redis,
+		db:          db,
+		dedup:       dedup,
+		recsToIndex: recsToIndex,
+		reporting:   reporting,
+		tz:          tz,
+		conf:        conf,
 	}
 }

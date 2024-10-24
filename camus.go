@@ -21,6 +21,7 @@ import (
 	"camus/cleaner"
 	"camus/cncdb"
 	"camus/cnf"
+	"camus/indexer"
 	"camus/reporting"
 	"context"
 	"flag"
@@ -57,6 +58,7 @@ type service interface {
 func createArchiver(
 	db cncdb.IMySQLOps,
 	rdb *archiver.RedisAdapter,
+	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
 	conf *cnf.Conf,
 ) *archiver.ArchKeeper {
@@ -70,6 +72,7 @@ func createArchiver(
 		rdb,
 		db,
 		dedup,
+		recsToIndex,
 		reporting,
 		conf.TimezoneLocation(),
 		conf.Archiver,
@@ -86,39 +89,41 @@ func main() {
 		BuildDate: cleanVersionInfo(buildDate),
 		GitCommit: cleanVersionInfo(gitCommit),
 	}
-
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Camus - Concordance Archive Manager by and for US\n\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n\t%s [options] start [config.json]\n\t", filepath.Base(os.Args[0]))
 		fmt.Fprintf(os.Stderr, "%s [options] version\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
-	dryRun := flag.Bool(
+	startCmd := flag.NewFlagSet("start", flag.ExitOnError)
+	dryRun := startCmd.Bool(
 		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
-	dryRunCleaner := flag.Bool(
+	dryRunCleaner := startCmd.Bool(
 		"dry-run-cleaner", false, "If set, the Cleaner service will just report operations to log without writing them to database")
-	flag.Parse()
-	action := flag.Arg(0)
-	if action == "version" {
+
+	initQHCmd := flag.NewFlagSet("init-query-history", flag.ExitOnError)
+	initChunkSize := startCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
+
+	var conf *cnf.Conf
+	action := os.Args[1]
+	switch action {
+	case "version":
 		fmt.Printf("mquery %s\nbuild date: %s\nlast commit: %s\n", version.Version, version.BuildDate, version.GitCommit)
 		return
+	case "start":
+		startCmd.Parse(os.Args[2:])
+		conf = cnf.LoadConfig(startCmd.Arg(0))
+	case "init-query-history":
+		initQHCmd.Parse(os.Args[2:])
+		conf = cnf.LoadConfig(initQHCmd.Arg(0))
 	}
-	conf := cnf.LoadConfig(flag.Arg(1))
+
 	logging.SetupLogging(conf.LogFile, conf.LogLevel)
 	log.Info().Msg("Starting Camus")
 	cnf.ValidateAndDefaults(conf)
 	syscallChan := make(chan os.Signal, 1)
 	signal.Notify(syscallChan, os.Interrupt)
 	signal.Notify(syscallChan, syscall.SIGTERM)
-	exitEvent := make(chan os.Signal)
-	jobExitEvent := make(chan os.Signal)
-	go func() {
-		evt := <-syscallChan
-		exitEvent <- evt
-		jobExitEvent <- evt
-		close(exitEvent)
-		close(jobExitEvent)
-	}()
 
 	switch action {
 	case "start":
@@ -128,7 +133,11 @@ func main() {
 			os.Exit(1)
 			return
 		}
-		rdb := archiver.NewRedisAdapter(conf.Redis)
+
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+
+		rdb := archiver.NewRedisAdapter(ctx, conf.Redis)
 
 		var reportingService reporting.IReporting
 		if conf.Reporting.Host != "" {
@@ -148,15 +157,13 @@ func main() {
 		}
 
 		var dbOps cncdb.IMySQLOps
-		dbOpsRaw := cncdb.NewMySQLOps(db, conf.TimezoneLocation())
+		dbOpsRaw := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
 		if *dryRun {
 			dbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
 
 		} else {
 			dbOps = dbOpsRaw
 		}
-
-		arch := createArchiver(dbOps, rdb, reportingService, conf)
 
 		var cleanerDbOps cncdb.IMySQLOps
 		if *dryRunCleaner {
@@ -166,16 +173,30 @@ func main() {
 			cleanerDbOps = dbOps
 		}
 
-		cln := cleaner.NewService(cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+		recsToIndex := make(chan cncdb.HistoryRecord)
 
-		as := &apiServer{
-			arch: arch,
-			conf: conf,
+		ftIndexer, err := indexer.NewIndexer(conf.Indexer, dbOps, rdb, recsToIndex)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to initialize index")
+			os.Exit(1)
+			return
 		}
 
-		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
-		services := []service{arch, cln, as, reportingService}
+		arch := createArchiver(dbOps, rdb, recsToIndex, reportingService, conf)
+
+		cln := cleaner.NewService(
+			cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+
+		fulltext := indexer.NewService(conf.Indexer, ftIndexer, rdb)
+
+		as := &apiServer{
+			arch:            arch,
+			conf:            conf,
+			fulltextService: fulltext,
+			rdb:             rdb,
+		}
+
+		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService}
 		for _, m := range services {
 			m.Start(ctx)
 		}
@@ -208,6 +229,20 @@ func main() {
 		case <-shutdownCtx.Done():
 			log.Warn().Msg("Shutdown timed out")
 		}
+	case "init-query-history":
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		db, err := cncdb.DBOpen(conf.MySQL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to open SQL database")
+			os.Exit(1)
+			return
+		}
+		exec := dataInitializer{
+			db:  cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
+			rdb: archiver.NewRedisAdapter(ctx, conf.Redis),
+		}
+		exec.run(ctx, conf, *initChunkSize)
 
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)

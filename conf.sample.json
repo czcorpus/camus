@@ -7,23 +7,36 @@
     "timeZone": "Europe/Prague",
     "logLevel": "debug",
     "redis": {
-        "host": "dbhost",
+        "host": "localhost",
         "port": 6379,
-        "db": 1,
+        "db": 1
+    },
+    "db": {
+        "host": "localhost",
+        "name": "dbname",
+        "user": "dbuser",
+        "password": "dbpassword"
+    },
+    "cleaner": {
+        "minAgeDaysUnvisited": 30,
+        "checkIntervalSecs": 200,
+        "numProcessItemsPerTick": 5
+    },
+    "reporting": {
+        "host": "localhost",
+        "user": "reporter",
+        "passwd": "rpassword",
+        "dbName": "rdbname"
+    },
+    "archiver": {
+        "checkIntervalSecs": 15,
+        "checkIntervalChunk": 2,
+        "ddStateFilePath": "./deduplicator.bin",
         "queueKey": "conc_archive_queue",
         "failedRecordsKey": "camus_failed_items"
     },
-    "db": {
-        "host": "sqlhost",
-        "name": "dbname",
-        "user": "dbuser",
-        "password": "***"
-    },
-    "cleaner": {
-        "checkIntervalSecs": 60,
-        "numProcessItemsPerTick": 5
-    },
-    "checkIntervalSecs": 5,
-    "checkIntervalChunk": 2,
-    "ddStateFilePath": "./deduplicator.bin"
+    "indexer": {
+        "docRemoveChannel": "query_history_fulltext_del_channel",
+        "indexDirPath": "/path/to/camus-fulltext"
+    }
 }

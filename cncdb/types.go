@@ -18,8 +18,13 @@ package cncdb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
+)
+
+var (
+	ErrRecordNotFound = errors.New("record not found")
 )
 
 type GeneralDataRecord map[string]any
@@ -78,4 +83,18 @@ func (rec ArchRecord) FetchData() (GeneralDataRecord, error) {
 		return GeneralDataRecord{}, fmt.Errorf("failed to fetch ArchRecord data: %w", err)
 	}
 	return ans, nil
+}
+
+// ----------------------------------
+
+type HistoryRecord struct {
+	QueryID string `json:"query_id"`
+	UserID  int    `json:"user_id"`
+	Created int64  `json:"created"`
+	Name    string `json:"name"`
+	Rec     *ArchRecord
+}
+
+func (qh *HistoryRecord) CreateIndexID() string {
+	return fmt.Sprintf("%d/%d/%s", qh.UserID, qh.Created, qh.QueryID)
 }
