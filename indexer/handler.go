@@ -25,6 +25,7 @@ import (
 
 	"github.com/czcorpus/cnc-gokit/uniresp"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -116,6 +117,7 @@ func (a *Actions) Search(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusBadRequest)
 		return
 	}
+	log.Debug().Any("searchArgs", queryData).Msg("obtained search query")
 	queryData = append(
 		queryData,
 		searchedTerm{

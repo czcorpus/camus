@@ -46,7 +46,16 @@ type Indexer struct {
 	db          cncdb.IMySQLOps
 	rdb         *archiver.RedisAdapter
 	bleveIdx    bleve.Index
+	dataPath    string
 	recsToIndex <-chan cncdb.HistoryRecord
+}
+
+func (idx *Indexer) DocCount() (uint64, error) {
+	return idx.bleveIdx.DocCount()
+}
+
+func (idx *Indexer) DataPath() string {
+	return idx.dataPath
 }
 
 // IndexRecentRecords takes latest `numLatest` records and
@@ -178,7 +187,7 @@ func (idx *Indexer) Search(terms []searchedTerm, limit int, order []string, fiel
 			return nil, fmt.Errorf("unexpected query object requirement: \"%s\"", term.Requirement)
 		}
 		if term.IsWildcard {
-			wc := bleve.NewWildcardQuery(term.Value)
+			wc := bleve.NewWildcardQuery("*" + term.Value + "*")
 			wc.SetField(term.Field)
 			addQueryFn(wc)
 
@@ -288,5 +297,6 @@ func NewIndexer(
 		rdb:         rdb,
 		bleveIdx:    bleveIdx,
 		recsToIndex: recsToIndex,
+		dataPath:    conf.IndexDirPath,
 	}, nil
 }

@@ -1,6 +1,7 @@
 package documents
 
 import (
+	"camus/indexer/lotokenizer"
 	"fmt"
 
 	"github.com/blevesearch/bleve/v2"
@@ -16,6 +17,20 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	indexMapping := bleve.NewIndexMapping()
 
 	err := indexMapping.AddCustomAnalyzer(
+		"kontext_label_analyzer",
+		map[string]interface{}{
+			"type":      custom.Name,
+			"tokenizer": lotokenizer.Name,
+			"token_filters": []string{
+				lowercase.Name,
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize fulltext mappings: %w", err)
+	}
+
+	err = indexMapping.AddCustomAnalyzer(
 		"kontext_query_analyzer",
 		map[string]interface{}{
 			"type":      custom.Name,
@@ -33,8 +48,10 @@ func CreateMapping() (mapping.IndexMapping, error) {
 
 	// field types
 	exactStringMapping := bleve.NewKeywordFieldMapping()
-	multiValMapping := bleve.NewTextFieldMapping()
-	multiValMapping.Analyzer = "kontext_query_analyzer"
+	queryMultiValMapping := bleve.NewTextFieldMapping()
+	queryMultiValMapping.Analyzer = "kontext_query_analyzer"
+	labelMultiValMapping := bleve.NewTextFieldMapping()
+	labelMultiValMapping.Analyzer = "kontext_label_analyzer"
 	dtMapping := bleve.NewDateTimeFieldMapping()
 
 	// conc type
@@ -44,14 +61,14 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	concMapping.AddFieldMappingsAt("created", dtMapping)
 	concMapping.AddFieldMappingsAt("user_id", exactStringMapping)
 	concMapping.AddFieldMappingsAt("is_simple_query", exactStringMapping)
-	concMapping.AddFieldMappingsAt("corpora", multiValMapping)
-	concMapping.AddFieldMappingsAt("subcorpus", multiValMapping)
-	concMapping.AddFieldMappingsAt("raw_query", multiValMapping)
-	concMapping.AddFieldMappingsAt("structures", multiValMapping)
-	concMapping.AddFieldMappingsAt("struct_attr_names", multiValMapping)
-	concMapping.AddFieldMappingsAt("struct_attr_values", multiValMapping)
-	concMapping.AddFieldMappingsAt("pos_attr_names", multiValMapping)
-	concMapping.AddFieldMappingsAt("pos_attr_values", multiValMapping)
+	concMapping.AddFieldMappingsAt("corpora", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("subcorpus", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("raw_query", queryMultiValMapping)
+	concMapping.AddFieldMappingsAt("structures", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("struct_attr_names", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("struct_attr_values", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("pos_attr_names", labelMultiValMapping)
+	concMapping.AddFieldMappingsAt("pos_attr_values", queryMultiValMapping)
 
 	indexMapping.AddDocumentMapping("conc", concMapping)
 
@@ -62,12 +79,12 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	wlistMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	wlistMapping.AddFieldMappingsAt("created", dtMapping)
 	wlistMapping.AddFieldMappingsAt("user_id", exactStringMapping)
-	wlistMapping.AddFieldMappingsAt("corpora", multiValMapping)
-	wlistMapping.AddFieldMappingsAt("subcorpus", multiValMapping)
-	wlistMapping.AddFieldMappingsAt("raw_query", multiValMapping)
-	wlistMapping.AddFieldMappingsAt("pos_attr_names", multiValMapping)
-	wlistMapping.AddFieldMappingsAt("pfilter_words", multiValMapping)
-	wlistMapping.AddFieldMappingsAt("nfilter_words", multiValMapping)
+	wlistMapping.AddFieldMappingsAt("corpora", labelMultiValMapping)
+	wlistMapping.AddFieldMappingsAt("subcorpus", labelMultiValMapping)
+	wlistMapping.AddFieldMappingsAt("raw_query", queryMultiValMapping)
+	wlistMapping.AddFieldMappingsAt("pos_attr_names", labelMultiValMapping)
+	wlistMapping.AddFieldMappingsAt("pfilter_words", queryMultiValMapping)
+	wlistMapping.AddFieldMappingsAt("nfilter_words", queryMultiValMapping)
 
 	indexMapping.AddDocumentMapping("wlist", wlistMapping)
 
@@ -77,10 +94,10 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	kwordsMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	kwordsMapping.AddFieldMappingsAt("created", dtMapping)
 	kwordsMapping.AddFieldMappingsAt("user_id", exactStringMapping)
-	kwordsMapping.AddFieldMappingsAt("corpora", multiValMapping)
-	kwordsMapping.AddFieldMappingsAt("subcorpus", multiValMapping)
-	kwordsMapping.AddFieldMappingsAt("raw_query", multiValMapping)
-	kwordsMapping.AddFieldMappingsAt("pos_attr_names", multiValMapping)
+	kwordsMapping.AddFieldMappingsAt("corpora", labelMultiValMapping)
+	kwordsMapping.AddFieldMappingsAt("subcorpus", labelMultiValMapping)
+	kwordsMapping.AddFieldMappingsAt("raw_query", queryMultiValMapping)
+	kwordsMapping.AddFieldMappingsAt("pos_attr_names", labelMultiValMapping)
 
 	indexMapping.AddDocumentMapping("kwords", kwordsMapping)
 
@@ -90,14 +107,14 @@ func CreateMapping() (mapping.IndexMapping, error) {
 	pqueryMapping.AddFieldMappingsAt("query_supertype", exactStringMapping)
 	pqueryMapping.AddFieldMappingsAt("created", dtMapping)
 	pqueryMapping.AddFieldMappingsAt("user_id", exactStringMapping)
-	pqueryMapping.AddFieldMappingsAt("corpora", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("subcorpus", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("raw_query", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("structures", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("struct_attr_names", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("struct_attr_values", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("pos_attr_names", multiValMapping)
-	pqueryMapping.AddFieldMappingsAt("pos_attr_values", multiValMapping)
+	pqueryMapping.AddFieldMappingsAt("corpora", labelMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("subcorpus", labelMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("raw_query", queryMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("structures", labelMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("struct_attr_names", labelMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("struct_attr_values", queryMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("pos_attr_names", labelMultiValMapping)
+	pqueryMapping.AddFieldMappingsAt("pos_attr_values", queryMultiValMapping)
 
 	indexMapping.AddDocumentMapping("pquery", pqueryMapping)
 
