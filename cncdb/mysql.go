@@ -274,7 +274,7 @@ func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]Histo
 	}
 	ans := make([]HistoryRecord, 0, int(ttl.Hours()/24*10)) // cap: just a rough estimation
 	for rows.Next() {
-		var hRec HistoryRecord
+		hRec := HistoryRecord{UserID: userID}
 		var name sql.NullString
 		err := rows.Scan(&hRec.QueryID, &hRec.Created, &name)
 		if err != nil {
