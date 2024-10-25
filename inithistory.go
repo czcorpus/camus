@@ -75,7 +75,8 @@ func (di *dataInitializer) run(
 	}
 	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
-	ftIndexer, err := indexer.NewIndexer(conf.Indexer, di.db, di.rdb, recsToIndex)
+
+	ftIndexer, err := indexer.NewIndexerOrDie(conf.Indexer, di.db, di.rdb, recsToIndex)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init query history")
 		os.Exit(3)

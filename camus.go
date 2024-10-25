@@ -126,9 +126,6 @@ func main() {
 
 	log.Info().Msg("Starting Camus")
 	cnf.ValidateAndDefaults(conf)
-	syscallChan := make(chan os.Signal, 1)
-	signal.Notify(syscallChan, os.Interrupt)
-	signal.Notify(syscallChan, syscall.SIGTERM)
 
 	switch action {
 	case "start":
@@ -243,6 +240,7 @@ func main() {
 			os.Exit(1)
 			return
 		}
+		log.Info().Msgf("using database %s@%s", conf.MySQL.Name, conf.MySQL.Host)
 		exec := dataInitializer{
 			db:  cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
 			rdb: archiver.NewRedisAdapter(ctx, conf.Redis),

@@ -24,6 +24,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search/query"
@@ -299,4 +301,31 @@ func NewIndexer(
 		recsToIndex: recsToIndex,
 		dataPath:    conf.IndexDirPath,
 	}, nil
+}
+
+type asyncIndexerRes struct {
+	value *Indexer
+	err   error
+}
+
+func NewIndexerOrDie(
+	conf *Conf,
+	db cncdb.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+	recsToIndex <-chan cncdb.HistoryRecord,
+) (*Indexer, error) {
+	resultChan := make(chan asyncIndexerRes, 1)
+	go func() {
+		res, err := NewIndexer(conf, db, rdb, recsToIndex)
+		resultChan <- asyncIndexerRes{res, err}
+	}()
+
+	select {
+	case ans := <-resultChan:
+		return ans.value, ans.err
+	case <-time.After(time.Second * 10):
+		fmt.Println("Failed to open index due to timeout. The index is likely in use.")
+		os.Exit(10)
+	}
+	return nil, fmt.Errorf("failed to open index - unknown error")
 }
