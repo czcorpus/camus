@@ -114,12 +114,16 @@ func main() {
 	case "start":
 		startCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(startCmd.Arg(0))
+		logging.SetupLogging(conf.LogFile, conf.LogLevel)
 	case "init-query-history":
 		initQHCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(initQHCmd.Arg(0))
+		if *logToConsole {
+			conf.LogFile = ""
+		}
+		logging.SetupLogging(conf.LogFile, conf.LogLevel)
 	}
 
-	logging.SetupLogging(conf.LogFile, conf.LogLevel)
 	log.Info().Msg("Starting Camus")
 	cnf.ValidateAndDefaults(conf)
 	syscallChan := make(chan os.Signal, 1)
@@ -231,9 +235,6 @@ func main() {
 			log.Warn().Msg("Shutdown timed out")
 		}
 	case "init-query-history":
-		if *logToConsole {
-			conf.LogFile = ""
-		}
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 		db, err := cncdb.DBOpen(conf.MySQL)
