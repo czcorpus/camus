@@ -68,6 +68,14 @@ type RedisAdapter struct {
 	ctx   context.Context
 }
 
+func (rd *RedisAdapter) Type(k string) (string, error) {
+	cmd := rd.redis.Type(rd.ctx, k)
+	if cmd.Err() != nil {
+		return "", fmt.Errorf("failed to determine type of %s: %w", k, cmd.Err())
+	}
+	return cmd.Val(), nil
+}
+
 func (rd *RedisAdapter) Get(k string) (string, error) {
 	cmd := rd.redis.Get(rd.ctx, k)
 	if cmd.Err() == redis.Nil {
@@ -77,6 +85,14 @@ func (rd *RedisAdapter) Get(k string) (string, error) {
 		return "", fmt.Errorf("failed to get Redis entry %s: %w", k, cmd.Err())
 	}
 	return cmd.Val(), nil
+}
+
+func (rd *RedisAdapter) Set(k string, v any) error {
+	cmd := rd.redis.Set(rd.ctx, k, v, 0)
+	if cmd.Err() != nil {
+		return fmt.Errorf("failed to set Redis item %s: %w", k, cmd.Err())
+	}
+	return nil
 }
 
 func (rd *RedisAdapter) Exists(key string) (bool, error) {
@@ -89,14 +105,6 @@ func (rd *RedisAdapter) Exists(key string) (bool, error) {
 
 func (rd *RedisAdapter) TriggerChan(chname, value string) error {
 	return rd.redis.Publish(rd.ctx, chname, value).Err()
-}
-
-func (rd *RedisAdapter) Set(k string, v any) error {
-	cmd := rd.redis.Set(rd.ctx, k, v, 0)
-	if cmd.Err() != nil {
-		return fmt.Errorf("failed to set Redis item %s: %w", k, cmd.Err())
-	}
-	return nil
 }
 
 func (rd *RedisAdapter) UintZAdd(key string, v int) error {

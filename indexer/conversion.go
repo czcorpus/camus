@@ -47,6 +47,10 @@ type IndexableMidDoc interface {
 	AsIndexableDoc() documents.IndexableDoc
 }
 
+// concDB describes an object capable of retrieving
+// concordances from a storage. In case a record with
+// specified ID is not found, the function should
+// return cncdb.ErrRecordNotFound
 type concDB interface {
 	GetConcRecord(id string) (cncdb.ArchRecord, error)
 }

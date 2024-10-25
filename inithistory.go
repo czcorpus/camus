@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -24,14 +25,12 @@ type dataInitializer struct {
 func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *indexer.Indexer) error {
 	rec, err := di.rdb.GetConcRecord(hRec.QueryID)
 	if err == cncdb.ErrRecordNotFound {
-		log.Info().Str("queryId", hRec.QueryID).Msg("record not found in Redis, trying MySQL")
 		recs, err := di.db.LoadRecordsByID(hRec.QueryID)
 		if err != nil {
 			return fmt.Errorf("failed to load query %s from MySQL: %w", hRec.QueryID, err)
 		}
 		if len(recs) == 0 {
-			log.Warn().Str("queryId", hRec.QueryID).Msg("record is gone - cannot process, ignoring")
-			return nil
+			return fmt.Errorf("record %s is gone (both Redis and MySQL) - skipping", hRec.QueryID)
 		}
 		rec = recs[0]
 
@@ -44,7 +43,7 @@ func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *ind
 		return fmt.Errorf("failed to index query %s: %w", hRec.QueryID, err)
 	}
 	if !ok {
-		log.Warn().Str("queryId", hRec.QueryID).Msg("record not indexable - skipped")
+		return fmt.Errorf("record %s is not indexable - skipped", hRec.QueryID)
 	}
 	return nil
 }
@@ -54,6 +53,23 @@ func (di *dataInitializer) run(
 	conf *cnf.Conf,
 	chunkSize int,
 ) {
+	// check for status of possible previous run first
+	keyType, err := di.rdb.Type(usersProcSetKey)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to init query history")
+		os.Exit(1)
+		return
+	}
+	if keyType == "string" {
+		log.Error().
+			Str("key", usersProcSetKey).
+			Msg("it appears that a previous import was performed - to override, you must remove the key from Redis")
+		os.Exit(1)
+		return
+	}
+
+	var finishedAllChunks bool
+
 	cacheExists, err := di.rdb.Exists(usersProcSetKey)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init query history")
@@ -91,7 +107,7 @@ func (di *dataInitializer) run(
 			return
 		}
 		if nextUserID < 0 {
-			log.Info().Msg("no more items - ending")
+			finishedAllChunks = true
 			break
 		}
 		qIDs, err := di.db.GetUserQueryHistory(nextUserID, conf.Indexer.KonTextHistoryTTL())
@@ -136,4 +152,12 @@ func (di *dataInitializer) run(
 		Int("remainingUsers", remainingUsers).
 		Int("chunkSize", chunkSize).
 		Msg("chunk processed")
+	if finishedAllChunks {
+		rec := fmt.Sprintf("finished-%s", time.Now().In(conf.TimezoneLocation()))
+		log.Info().Msgf("no more items - writing '%s' to Redis and ending", rec)
+		if err := di.rdb.Set(usersProcSetKey, rec); err != nil {
+			log.Error().Err(err).Msg("failed to write 'finished' record to Redis")
+			os.Exit(5)
+		}
+	}
 }
