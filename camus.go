@@ -102,8 +102,8 @@ func main() {
 		"dry-run-cleaner", false, "If set, the Cleaner service will just report operations to log without writing them to database")
 
 	initQHCmd := flag.NewFlagSet("init-query-history", flag.ExitOnError)
-	initChunkSize := startCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
-	logToConsole := startCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
+	initChunkSize := initQHCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
+	logToConsole := initQHCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
 
 	var conf *cnf.Conf
 	action := os.Args[1]
