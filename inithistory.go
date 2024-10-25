@@ -71,6 +71,7 @@ func (di *dataInitializer) run(
 		for _, uid := range users {
 			di.rdb.UintZAdd(usersProcSetKey, uid)
 		}
+		log.Info().Int("numberOfUsers", len(users)).Msg("added users to process")
 	}
 	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
@@ -80,7 +81,7 @@ func (di *dataInitializer) run(
 		os.Exit(3)
 		return
 	}
-
+	log.Info().Int("chunkSize", chunkSize).Msg("processing next chunk of users")
 	for i := 0; i < chunkSize; i++ {
 		nextUserID, err := di.rdb.UintZRemLowest(usersProcSetKey)
 		if err != nil {

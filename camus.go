@@ -103,6 +103,7 @@ func main() {
 
 	initQHCmd := flag.NewFlagSet("init-query-history", flag.ExitOnError)
 	initChunkSize := startCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
+	logToConsole := startCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
 
 	var conf *cnf.Conf
 	action := os.Args[1]
@@ -230,6 +231,9 @@ func main() {
 			log.Warn().Msg("Shutdown timed out")
 		}
 	case "init-query-history":
+		if *logToConsole {
+			conf.LogFile = ""
+		}
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 		db, err := cncdb.DBOpen(conf.MySQL)
