@@ -161,6 +161,7 @@ func (doc *MidPQuery) AsIndexableDoc() IndexableDoc {
 		QuerySupertype:   string(doc.QuerySupertype),
 		Created:          doc.Created,
 		UserID:           strconv.Itoa(doc.UserID),
+		Corpora:          strings.Join(doc.Corpora, " "),
 		RawQuery:         doc.getRawQueriesAsString(),
 		Structures:       strings.Join(doc.Structures, " "),
 		PosAttrNames:     strings.Join(posAttrNames, " "),
