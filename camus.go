@@ -91,11 +91,17 @@ func main() {
 	}
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Camus - Concordance Archive Manager by and for US\n\n")
-		fmt.Fprintf(os.Stderr, "Usage:\n\t%s [options] start [config.json]\n\t", filepath.Base(os.Args[0]))
-		fmt.Fprintf(os.Stderr, "%s [options] version\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "Usage:\n\t%s [options] start [config.json]\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "\t%s [options] init-query-history [config.json]\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "\t%s [options] version\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
 	startCmd := flag.NewFlagSet("start", flag.ExitOnError)
+	startCmd.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Camus - start the service\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] start [config.json]\n", filepath.Base(os.Args[0]))
+		startCmd.PrintDefaults()
+	}
 	dryRun := startCmd.Bool(
 		"dry-run", false, "If set, then instead of writing to database, Camus will just report operations to the log")
 	dryRunCleaner := startCmd.Bool(
@@ -105,16 +111,29 @@ func main() {
 	initChunkSize := initQHCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
 	logToConsole := initQHCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
 
+	versionCmd := flag.NewFlagSet("version", flag.ExitOnError)
+	versionCmd.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Camus - get version information\n\n")
+		fmt.Fprintf(os.Stderr, "Usage:\n\t%s version\n", filepath.Base(os.Args[0]))
+		versionCmd.PrintDefaults()
+	}
+
 	var conf *cnf.Conf
-	action := os.Args[1]
+	var action string
+	if len(os.Args) > 1 {
+		action = os.Args[1]
+	}
 	switch action {
 	case "version":
+		versionCmd.Parse(os.Args[2:])
 		fmt.Printf("mquery %s\nbuild date: %s\nlast commit: %s\n", version.Version, version.BuildDate, version.GitCommit)
 		return
 	case "start":
 		startCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(startCmd.Arg(0))
 		logging.SetupLogging(conf.LogFile, conf.LogLevel)
+		log.Info().Msg("Starting Camus")
+		cnf.ValidateAndDefaults(conf)
 	case "init-query-history":
 		initQHCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(initQHCmd.Arg(0))
@@ -122,10 +141,15 @@ func main() {
 			conf.LogFile = ""
 		}
 		logging.SetupLogging(conf.LogFile, conf.LogLevel)
+		cnf.ValidateAndDefaults(conf)
+	default:
+		flag.Usage()
+		fmt.Fprintf(
+			os.Stderr,
+			"\nUse 'camus COMMAND -h' for more information about a specific action\n\n",
+		)
+		os.Exit(0)
 	}
-
-	log.Info().Msg("Starting Camus")
-	cnf.ValidateAndDefaults(conf)
 
 	switch action {
 	case "start":
