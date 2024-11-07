@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -101,12 +102,19 @@ func importConc(
 	if ans.StructAttrs == nil {
 		ans.StructAttrs = make(map[string][]string)
 	}
+	if ans.Structures == nil {
+		ans.Structures = make([]string, 0, len(form.LastopForm.SelectedTextTypes))
+	}
 	for attr, items := range form.LastopForm.SelectedTextTypes {
 		_, ok := ans.StructAttrs[attr]
 		if !ok {
 			ans.StructAttrs[attr] = make([]string, 0, len(items))
 		}
 		ans.StructAttrs[attr] = append(ans.StructAttrs[attr], items...)
+		tmp := strings.Split(attr, ".")
+		if len(tmp) > 1 {
+			ans.Structures = append(ans.Structures, tmp[0])
+		}
 	}
 
 	return ans, nil
