@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
@@ -189,7 +190,13 @@ func (idx *Indexer) Search(terms []searchedTerm, limit int, order []string, fiel
 			return nil, fmt.Errorf("unexpected query object requirement: \"%s\"", term.Requirement)
 		}
 		if term.IsWildcard {
-			wc := bleve.NewWildcardQuery("*" + term.Value + "*")
+			// Note: here we have to convert the query to lower case manually
+			// as it appears Bleve does not use respective mapping filter and
+			// our fields use 'kontext_query_analyzer' which applies lowercase
+			// conversion. Also note that this may cause problem in some edge
+			// cases as the filter's algorithm is not the same as used
+			// in strings.ToLower
+			wc := bleve.NewWildcardQuery("*" + strings.ToLower(term.Value) + "*")
 			wc.SetField(term.Field)
 			addQueryFn(wc)
 

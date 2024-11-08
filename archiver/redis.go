@@ -175,7 +175,6 @@ func (rd *RedisAdapter) NextNArchItems(queueKey string, n int64) ([]queueRecord,
 		return []queueRecord{}, fmt.Errorf("failed to get items from queue: %w", err)
 	}
 	items, err := lrangeCmd.Result()
-	fmt.Println("ITEMS: ", items)
 	if err != nil {
 		return []queueRecord{}, fmt.Errorf("failed to get items from queue: %w", err)
 	}

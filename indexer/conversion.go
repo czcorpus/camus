@@ -67,7 +67,7 @@ func importConc(
 	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
-	subcName, err := rec.GetSubcorpus(db)
+	subcProps, err := rec.GetSubcorpus(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
@@ -77,7 +77,7 @@ func importConc(
 		Created:        time.Unix(hRec.Created, 0),
 		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
-		Subcorpus:      subcName,
+		Subcorpus:      subcProps.Name,
 		QuerySupertype: stype,
 		RawQueries:     make([]cncdb.RawQuery, 0, len(form.LastopForm.CurrQueries)),
 	}
@@ -105,7 +105,21 @@ func importConc(
 	if ans.Structures == nil {
 		ans.Structures = make([]string, 0, len(form.LastopForm.SelectedTextTypes))
 	}
+	var tt map[string][]string
+	if len(subcProps.TextTypes) > 0 {
+		tt = subcProps.TextTypes
+
+	} else {
+		tt = make(map[string][]string)
+	}
 	for attr, items := range form.LastopForm.SelectedTextTypes {
+		tmp, ok := tt[attr]
+		if !ok {
+			tmp = make([]string, 0, 10)
+		}
+		tt[attr] = append(tmp, items...)
+	}
+	for attr, items := range tt {
 		_, ok := ans.StructAttrs[attr]
 		if !ok {
 			ans.StructAttrs[attr] = make([]string, 0, len(items))
@@ -131,7 +145,7 @@ func importWlist(
 		return nil, err
 	}
 
-	subcName, err := rec.GetSubcorpus(db)
+	subcProps, err := rec.GetSubcorpus(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
@@ -142,7 +156,7 @@ func importWlist(
 		Created:        time.Unix(hRec.Created, 0),
 		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
-		Subcorpus:      subcName,
+		Subcorpus:      subcProps.Name,
 		RawQuery:       form.Form.WLPattern,
 		PosAttrNames:   []string{form.Form.WLAttr},
 		PFilterWords:   form.Form.PFilterWords,
@@ -163,19 +177,19 @@ func importKwords(
 	}
 
 	subcorpora := make([]string, 0, 2)
-	subcName1, err := rec.GetSubcorpus(db)
+	subcProps1, err := rec.GetSubcorpus(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
-	if subcName1 != "" {
-		subcorpora = append(subcorpora, subcName1)
+	if subcProps1.Name != "" {
+		subcorpora = append(subcorpora, subcProps1.Name)
 	}
-	subcName2, err := db.GetSubcorpusName(form.Form.RefUsesubcorp)
+	subcProps2, err := db.GetSubcorpusProps(form.Form.RefUsesubcorp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
-	if subcName2 != "" {
-		subcorpora = append(subcorpora, subcName2)
+	if subcProps2.Name != "" {
+		subcorpora = append(subcorpora, subcProps2.Name)
 	}
 	corpora := append(rec.Corpora, form.Form.RefCorpname)
 
@@ -204,7 +218,7 @@ func importPquery(
 	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
 		return nil, err
 	}
-	subcName, err := rec.GetSubcorpus(db)
+	subcProps, err := rec.GetSubcorpus(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert rec. to doc.: %w", err)
 	}
@@ -262,7 +276,7 @@ func importPquery(
 		Created:        time.Unix(hRec.Created, 0),
 		UserID:         hRec.UserID,
 		Corpora:        rec.Corpora,
-		Subcorpus:      subcName,
+		Subcorpus:      subcProps.Name,
 		QuerySupertype: stype,
 		RawQueries:     mergedRawQueries,
 		PosAttrs:       mergedPosAttrs,
