@@ -58,8 +58,8 @@ func (dsql *DummySQL) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return [][2]int{}, nil
 }
 
-func (dsql *DummySQL) GetSubcorpusName(subcID string) (string, error) {
-	return "", nil
+func (dsql *DummySQL) GetSubcorpusProps(subcID string) (SubcProps, error) {
+	return SubcProps{}, nil
 }
 
 func (dsql *DummySQL) GetAllUsersWithQueryHistory() ([]int, error) {

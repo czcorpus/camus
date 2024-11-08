@@ -19,6 +19,7 @@ package cncdb
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -224,21 +225,28 @@ func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetSubcorpusName(subcID string) (string, error) {
+func (ops *MySQLOps) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	if subcID == "" {
-		return "", nil
+		return SubcProps{}, nil
 	}
 	row := ops.db.QueryRowContext(
 		ops.ctx,
-		"SELECT name FROM kontext_subcorpus WHERE id = ?", subcID)
+		"SELECT name, text_types FROM kontext_subcorpus WHERE id = ?", subcID)
 	var name string
-	if err := row.Scan(&name); err != nil {
+	var textTypes sql.NullString
+	if err := row.Scan(&name, &textTypes); err != nil {
 		if err == sql.ErrNoRows {
-			return "", nil
+			return SubcProps{}, nil
 		}
-		return "", fmt.Errorf("failed to get subcorpus name: %w", err)
+		return SubcProps{}, fmt.Errorf("failed to get subcorpus props: %w", err)
 	}
-	return name, nil
+	tt := make(map[string][]string)
+	if textTypes.Valid {
+		if err := json.Unmarshal([]byte(textTypes.String), &tt); err != nil {
+			return SubcProps{}, fmt.Errorf("failed to get subcorpus props: %w", err)
+		}
+	}
+	return SubcProps{Name: name, TextTypes: tt}, nil
 }
 
 func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {

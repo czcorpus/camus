@@ -69,8 +69,8 @@ func (ops *MySQLDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ops.db.GetArchSizesByYears(forceLoad)
 }
 
-func (ops *MySQLDryRun) GetSubcorpusName(subcID string) (string, error) {
-	return ops.db.GetSubcorpusName(subcID)
+func (ops *MySQLDryRun) GetSubcorpusProps(subcID string) (SubcProps, error) {
+	return ops.db.GetSubcorpusProps(subcID)
 }
 
 func (ops *MySQLDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
