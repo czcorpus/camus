@@ -34,7 +34,7 @@ func TestExtractCQLProps(t *testing.T) {
 		},
 	}
 	form := &cncdb.ConcFormRecord{Q: []string{"aword,[]"}}
-	err := ExtractQueryProps(form, &doc)
+	err := ExtractFormQueryProps(form, &doc)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"hi|hello", "p.*"}, doc.PosAttrs["word"])
 	assert.Equal(t, []string{"people"}, doc.PosAttrs["lemma"])
@@ -53,7 +53,7 @@ func TestExtractCQLPropsWithDefaultAttr(t *testing.T) {
 		},
 	}
 	form := &cncdb.ConcFormRecord{Q: []string{"aword,[]"}}
-	err := ExtractQueryProps(form, &doc)
+	err := ExtractFormQueryProps(form, &doc)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"party"}, doc.PosAttrs["word"])
 }

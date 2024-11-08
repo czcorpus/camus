@@ -88,42 +88,49 @@ func extractSimpleQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
 	return nil
 }
 
-// ExtractQueryProps parses queries stored in `doc` and
+func ExtractQueryProps(query string, queryName string, defaultAttr string, doc CQLMidDoc) error {
+	q, err := cql.ParseCQL(queryName, query)
+	if err != nil {
+		return fmt.Errorf("failed to extract CQL properties: %w", err)
+	}
+
+	for _, cqlProp := range q.ExtractProps() {
+		if cqlProp.IsStructAttr() {
+			key := fmt.Sprintf("%s.%s", cqlProp.Structure, cqlProp.Name)
+			doc.AddStructAttr(key, cqlProp.Value)
+
+		} else if cqlProp.IsStructure() {
+			doc.AddStructure(cqlProp.Structure)
+
+		} else if cqlProp.IsPosattr() {
+			if cqlProp.Name != "" {
+				doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
+
+			} else {
+				doc.AddPosAttr(defaultAttr, cqlProp.Value)
+			}
+		}
+	}
+	return nil
+}
+
+// ExtractFormQueryProps parses queries stored in `doc` and
 // extracts used attributes, structures and respective values
 // into doc's properties.
 // Note that only "advanced" queries are extracted. In case there
 // are no advanced queries in the document, nothing is changed.
-func ExtractQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
-
+func ExtractFormQueryProps(form *cncdb.ConcFormRecord, doc CQLMidDoc) error {
 	for i, rq := range doc.GetRawQueries() {
 		if rq.Type != "advanced" {
 			continue
 		}
-		q, err := cql.ParseCQL(fmt.Sprintf("query-%d", i), rq.Value)
-		if err != nil {
-			return fmt.Errorf("failed to extract CQL properties: %w", err)
+		if err := ExtractQueryProps(rq.Value, fmt.Sprintf("query-%d", i), form.GetDefaultAttr(), doc); err != nil {
+			return fmt.Errorf("failed to extract form query props: %w", err)
 		}
 
-		for _, cqlProp := range q.ExtractProps() {
-			if cqlProp.IsStructAttr() {
-				key := fmt.Sprintf("%s.%s", cqlProp.Structure, cqlProp.Name)
-				doc.AddStructAttr(key, cqlProp.Value)
-
-			} else if cqlProp.IsStructure() {
-				doc.AddStructure(cqlProp.Structure)
-
-			} else if cqlProp.IsPosattr() {
-				if cqlProp.Name != "" {
-					doc.AddPosAttr(cqlProp.Name, cqlProp.Value)
-
-				} else {
-					doc.AddPosAttr(form.GetDefaultAttr(), cqlProp.Value)
-				}
-			}
-		}
 	}
 	if err := extractSimpleQueryProps(form, doc); err != nil {
-		return err
+		return fmt.Errorf("failed to extract form query props: %w", err)
 	}
 	return nil
 }

@@ -56,6 +56,14 @@ type concDB interface {
 	GetConcRecord(id string) (cncdb.ArchRecord, error)
 }
 
+type withinCondRec struct {
+	Negated       bool   `json:"negated"`
+	StructureName string `json:"structure_name"`
+	AttributeCQL  string `json:"attribute_cql"`
+}
+
+type withinCondRecSpec []withinCondRec
+
 func importConc(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
@@ -89,7 +97,7 @@ func importConc(
 		})
 	}
 
-	if err := documents.ExtractQueryProps(&form, ans); err != nil {
+	if err := documents.ExtractFormQueryProps(&form, ans); err != nil {
 		rqs := make([]string, len(ans.GetRawQueries()))
 		for i, rq := range ans.GetRawQueries() {
 			rqs[i] = rq.Value
@@ -128,6 +136,24 @@ func importConc(
 		tmp := strings.Split(attr, ".")
 		if len(tmp) > 1 {
 			ans.Structures = append(ans.Structures, tmp[0])
+		}
+	}
+
+	if subcProps.Within != "" {
+		var wth withinCondRecSpec
+		if err := json.Unmarshal([]byte(subcProps.Within), &wth); err != nil {
+			return nil, fmt.Errorf("failed to import conc, `within` condition: %w", err)
+		}
+		for i, wItem := range wth {
+			fmt.Println(fmt.Sprintf("[] within <%s %s />", wItem.StructureName, subcProps.Within))
+			if err := documents.ExtractQueryProps(
+				fmt.Sprintf("[] within <%s %s />", wItem.StructureName, subcProps.Within),
+				fmt.Sprintf("within-query-%d", i),
+				form.GetDefaultAttr(),
+				ans,
+			); err != nil {
+				return nil, fmt.Errorf("failed to import conc, `within` condition[%d]: %w", i, err)
+			}
 		}
 	}
 

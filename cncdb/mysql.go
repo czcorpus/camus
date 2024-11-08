@@ -231,10 +231,11 @@ func (ops *MySQLOps) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	}
 	row := ops.db.QueryRowContext(
 		ops.ctx,
-		"SELECT name, text_types FROM kontext_subcorpus WHERE id = ?", subcID)
+		"SELECT name, text_types, within_cond FROM kontext_subcorpus WHERE id = ?", subcID)
 	var name string
 	var textTypes sql.NullString
-	if err := row.Scan(&name, &textTypes); err != nil {
+	var withinCond sql.NullString
+	if err := row.Scan(&name, &textTypes, &withinCond); err != nil {
 		if err == sql.ErrNoRows {
 			return SubcProps{}, nil
 		}
@@ -246,7 +247,11 @@ func (ops *MySQLOps) GetSubcorpusProps(subcID string) (SubcProps, error) {
 			return SubcProps{}, fmt.Errorf("failed to get subcorpus props: %w", err)
 		}
 	}
-	return SubcProps{Name: name, TextTypes: tt}, nil
+	var within string
+	if withinCond.Valid {
+		within = withinCond.String
+	}
+	return SubcProps{Name: name, TextTypes: tt, Within: within}, nil
 }
 
 func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {

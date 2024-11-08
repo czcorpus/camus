@@ -21,6 +21,7 @@ import "time"
 type SubcProps struct {
 	Name      string
 	TextTypes map[string][]string
+	Within    string
 }
 
 // IMySQLOps is an abstract interface for high level
