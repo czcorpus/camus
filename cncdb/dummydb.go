@@ -66,7 +66,7 @@ func (dsql *DummySQL) GetAllUsersWithQueryHistory() ([]int, error) {
 	return []int{}, nil
 }
 
-func (dsql *DummySQL) GetUserQueryHistory(userID int, ttl time.Duration) ([]HistoryRecord, error) {
+func (dsql *DummySQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
 

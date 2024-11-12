@@ -269,18 +269,21 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetUserQueryHistory(userID int, ttl time.Duration) ([]HistoryRecord, error) {
-	oldestDate := time.Now().In(ops.tz).Add(-ttl)
+func (ops *MySQLOps) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
-		"SELECT query_id, created, name FROM kontext_query_history "+
-			"WHERE user_id = ? AND (name IS NOT NULL OR created >= ?)",
-		userID, oldestDate,
+		"SELECT query_id, created, name FROM ( "+
+			"SELECT * FROM kontext_query_history WHERE user_id = ? AND name IS NOT NULL "+
+			"UNION "+
+			"SELECT * FROM kontext_query_history WHERE user_id = ? ORDER BY created DESC LIMIT ? "+
+			") AS combined "+
+			"ORDER BY created DESC LIMIT ? ",
+		userID, userID, numItems, numItems,
 	)
 	if err != nil {
 		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 	}
-	ans := make([]HistoryRecord, 0, int(ttl.Hours()/24*10)) // cap: just a rough estimation
+	ans := make([]HistoryRecord, 0, numItems)
 	for rows.Next() {
 		hRec := HistoryRecord{UserID: userID}
 		var name sql.NullString

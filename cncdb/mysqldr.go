@@ -77,8 +77,8 @@ func (ops *MySQLDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ops.db.GetAllUsersWithQueryHistory()
 }
 
-func (ops *MySQLDryRun) GetUserQueryHistory(userID int, ttl time.Duration) ([]HistoryRecord, error) {
-	return ops.db.GetUserQueryHistory(userID, ttl)
+func (ops *MySQLDryRun) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+	return ops.db.GetUserQueryHistory(userID, numItems)
 }
 
 func (db *MySQLDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, error) {

@@ -18,19 +18,14 @@ package indexer
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/czcorpus/cnc-gokit/fs"
 )
 
 type Conf struct {
-	IndexDirPath          string `json:"indexDirPath"`
-	DocRemoveChannel      string `json:"docRemoveChannel"`
-	KonTextHistoryTTLDays int    `json:"konTextHistoryTtlDays"`
-}
-
-func (cnf *Conf) KonTextHistoryTTL() time.Duration {
-	return time.Duration(cnf.KonTextHistoryTTLDays) * time.Hour * 24
+	IndexDirPath           string `json:"indexDirPath"`
+	DocRemoveChannel       string `json:"docRemoveChannel"`
+	KonTextHistoryNumItems int    `json:"konTextHistoryNumItems"`
 }
 
 func (conf *Conf) ValidateAndDefaults() error {
