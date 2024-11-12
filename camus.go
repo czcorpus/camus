@@ -126,7 +126,7 @@ func main() {
 	switch action {
 	case "version":
 		versionCmd.Parse(os.Args[2:])
-		fmt.Printf("mquery %s\nbuild date: %s\nlast commit: %s\n", version.Version, version.BuildDate, version.GitCommit)
+		fmt.Printf("Camus %s\nbuild date: %s\nlast commit: %s\n", version.Version, version.BuildDate, version.GitCommit)
 		return
 	case "start":
 		startCmd.Parse(os.Args[2:])
