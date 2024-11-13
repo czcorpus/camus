@@ -195,7 +195,7 @@ func (job *ArchKeeper) performCheck() error {
 		rec.Created = time.Now().In(job.tz)
 
 		switch item.Type {
-		case QRTypeArchive:
+		case QRTypeArchive, "":
 			if item.Explicit {
 				job.handleExplicitReq(rec, item, &currStats)
 
@@ -210,12 +210,6 @@ func (job *ArchKeeper) performCheck() error {
 				Name:    item.Name,
 				Rec:     &rec,
 			}
-		default:
-			log.Error().
-				Str("recordId", item.Key).
-				Str("type", string(item.Type)).
-				Str("name", item.Name).
-				Msg("unknown query archive queue item type")
 		}
 	}
 	log.Info().
