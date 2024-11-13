@@ -63,7 +63,9 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 				log.Info().Msg("about to close ArchKeeper")
 				return
 			case <-ticker.C:
-				job.performCheck()
+				if err := job.performCheck(); err != nil {
+					log.Error().Err(err).Msg("Failed to archive query persistence items")
+				}
 			}
 		}
 	}()
