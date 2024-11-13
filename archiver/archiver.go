@@ -210,6 +210,12 @@ func (job *ArchKeeper) performCheck() error {
 				Name:    item.Name,
 				Rec:     &rec,
 			}
+		default:
+			log.Error().
+				Str("recordId", item.Key).
+				Str("type", string(item.Type)).
+				Str("name", item.Name).
+				Msg("unknown query archive queue item type")
 		}
 	}
 	log.Info().
