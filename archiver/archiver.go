@@ -56,6 +56,7 @@ type ArchKeeper struct {
 // Start starts the ArchKeeper service
 func (job *ArchKeeper) Start(ctx context.Context) {
 	ticker := time.NewTicker(job.conf.CheckInterval())
+	log.Info().Msg("starting archiver.ArchKeeper task")
 	go func() {
 		for {
 			select {
@@ -73,7 +74,7 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 
 // Stop stops the ArchKeeper service
 func (job *ArchKeeper) Stop(ctx context.Context) error {
-	log.Warn().Msg("stopping ArchKeeper")
+	log.Warn().Msg("stopping ArchKeeper task")
 	close(job.recsToIndex)
 	if err := job.dedup.OnClose(); err != nil {
 		return fmt.Errorf("failed to stop ArchKeeper properly: %w", err)
@@ -212,12 +213,14 @@ func (job *ArchKeeper) performCheck() error {
 			}
 		}
 	}
-	log.Info().
-		Int("numInserted", currStats.NumInserted).
-		Int("numMerged", currStats.NumMerged).
-		Int("numErrors", currStats.NumErrors).
-		Int("numFetched", numFetched).
-		Msg("regular archiving report")
+	if currStats.ShowsActivity() {
+		log.Info().
+			Int("numInserted", currStats.NumInserted).
+			Int("numMerged", currStats.NumMerged).
+			Int("numErrors", currStats.NumErrors).
+			Int("numFetched", numFetched).
+			Msg("regular archiving report")
+	}
 	job.reporting.WriteOperationsStatus(currStats)
 	job.stats.UpdateBy(currStats)
 	return nil

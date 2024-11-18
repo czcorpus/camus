@@ -68,6 +68,19 @@ type RedisAdapter struct {
 	ctx   context.Context
 }
 
+func (rd *RedisAdapter) String() string {
+	if rd.redis == nil {
+		return fmt.Sprintf(
+			"RedisAdapter (inactive), address %s:%d, db %d",
+			rd.conf.Host, rd.conf.Port, rd.conf.DB,
+		)
+	}
+	return fmt.Sprintf(
+		"RedisAdapter (active) address %s:%d, db %d",
+		rd.conf.Host, rd.conf.Port, rd.conf.DB,
+	)
+}
+
 func (rd *RedisAdapter) Type(k string) (string, error) {
 	cmd := rd.redis.Type(rd.ctx, k)
 	if cmd.Err() != nil {

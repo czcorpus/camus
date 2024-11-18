@@ -39,6 +39,10 @@ func (service *Service) Indexer() *Indexer {
 }
 
 func (service *Service) Start(ctx context.Context) {
+	log.Info().
+		Str("rmChan", service.rmChanName).
+		Str("redisHost", service.redis.String()).
+		Msg("starting indexer.Service task")
 	go func() {
 		for {
 			select {
@@ -70,7 +74,7 @@ func (service *Service) Start(ctx context.Context) {
 }
 
 func (service *Service) Stop(ctx context.Context) error {
-	log.Warn().Msg("shutting down fulltext search service")
+	log.Warn().Msg("stopping indexer.Service task")
 	return nil
 }
 
