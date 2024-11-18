@@ -34,6 +34,10 @@ func (bgs *OpStats) UpdateBy(other OpStats) {
 	bgs.NumFetched += other.NumFetched
 }
 
+func (bgs *OpStats) ShowsActivity() bool {
+	return bgs.NumErrors+bgs.NumMerged+bgs.NumInserted+bgs.NumFetched > 0
+}
+
 // ------------
 
 type CleanupStats struct {
