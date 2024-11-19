@@ -131,16 +131,16 @@ func main() {
 	case "start":
 		startCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(startCmd.Arg(0))
-		logging.SetupLogging(conf.LogFile, conf.LogLevel)
+		logging.SetupLogging(conf.Logging)
 		log.Info().Msg("Starting Camus")
 		cnf.ValidateAndDefaults(conf)
 	case "init-query-history":
 		initQHCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(initQHCmd.Arg(0))
 		if *logToConsole {
-			conf.LogFile = ""
+			conf.Logging.Path = ""
 		}
-		logging.SetupLogging(conf.LogFile, conf.LogLevel)
+		logging.SetupLogging(conf.Logging)
 		cnf.ValidateAndDefaults(conf)
 	default:
 		flag.Usage()

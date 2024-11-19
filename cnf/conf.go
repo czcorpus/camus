@@ -48,8 +48,7 @@ type Conf struct {
 	TimeZone               string              `json:"timeZone"`
 	AuthHeaderName         string              `json:"authHeaderName"`
 	AuthTokens             []string            `json:"authTokens"`
-	LogFile                string              `json:"logFile"`
-	LogLevel               logging.LogLevel    `json:"logLevel"`
+	Logging                logging.LoggingConf `json:"logging"`
 	Redis                  *archiver.RedisConf `json:"redis"`
 	MySQL                  *cncdb.DBConf       `json:"db"`
 	Archiver               *archiver.Conf      `json:"archiver"`
