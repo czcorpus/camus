@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/blevesearch/bleve/v2 v2.4.2
-	github.com/czcorpus/cnc-gokit v0.10.2
+	github.com/czcorpus/cnc-gokit v0.11.0
 	github.com/czcorpus/cqlizer v0.0.11
 	github.com/czcorpus/hltscl v0.0.6
 	github.com/davecgh/go-spew v1.1.1
@@ -19,6 +19,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/RoaringBitmap/roaring v1.9.3 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/blevesearch/bleve_index_api v1.1.10 // indirect
@@ -67,6 +68,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
+	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
@@ -80,5 +82,7 @@ require (
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
