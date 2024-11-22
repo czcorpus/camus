@@ -85,6 +85,15 @@ func (db *MySQLDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return db.db.LoadRecentNHistory(num)
 }
 
+func (db *MySQLDryRun) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+	log.Info().Msgf("DRY-RUN>>> GarbageCollectUserQueryHistory(%d)", userID)
+	return 0, nil
+}
+
+func (db *MySQLDryRun) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+	return db.db.GetUserGarbageHistory(userID)
+}
+
 func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {
 	return &MySQLDryRun{db: ops}
 }

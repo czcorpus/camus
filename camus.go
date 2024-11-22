@@ -94,6 +94,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Camus - Concordance Archive Manager by and for US\n\n")
 		fmt.Fprintf(os.Stderr, "Usage:\n\t%s [options] start [config.json]\n", filepath.Base(os.Args[0]))
 		fmt.Fprintf(os.Stderr, "\t%s [options] init-query-history [config.json]\n", filepath.Base(os.Args[0]))
+		fmt.Fprintf(os.Stderr, "\t%s [options] gc-query-history [config.json]\n", filepath.Base(os.Args[0]))
 		fmt.Fprintf(os.Stderr, "\t%s [options] version\n", filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 	}
@@ -111,6 +112,10 @@ func main() {
 	initQHCmd := flag.NewFlagSet("init-query-history", flag.ExitOnError)
 	initChunkSize := initQHCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
 	logToConsole := initQHCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
+
+	gcQueryHistoryCmd := flag.NewFlagSet("gc-query-history", flag.ExitOnError)
+	initChunkSize2 := gcQueryHistoryCmd.Int("chunk-size", 100, "How many items to process per run (can be run mulitple times while preserving proc. state)")
+	logToConsole2 := gcQueryHistoryCmd.Bool("console-log", false, "Log to console (even if a file is specified in config json)")
 
 	versionCmd := flag.NewFlagSet("version", flag.ExitOnError)
 	versionCmd.Usage = func() {
@@ -139,6 +144,14 @@ func main() {
 		initQHCmd.Parse(os.Args[2:])
 		conf = cnf.LoadConfig(initQHCmd.Arg(0))
 		if *logToConsole {
+			conf.Logging.Path = ""
+		}
+		logging.SetupLogging(conf.Logging)
+		cnf.ValidateAndDefaults(conf)
+	case "gc-query-history":
+		gcQueryHistoryCmd.Parse(os.Args[2:])
+		conf = cnf.LoadConfig(gcQueryHistoryCmd.Arg(0))
+		if *logToConsole2 {
 			conf.Logging.Path = ""
 		}
 		logging.SetupLogging(conf.Logging)
@@ -272,6 +285,20 @@ func main() {
 		)
 		exec.Run(ctx, conf, *initChunkSize)
 	case "gc-query-history": // aka garbage-collect-query-history
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		db, err := cncdb.DBOpen(conf.MySQL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to open SQL database")
+			os.Exit(1)
+			return
+		}
+		log.Info().Msgf("using database %s@%s", conf.MySQL.Name, conf.MySQL.Host)
+		exec := history.NewGarbageCollector(
+			cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
+			archiver.NewRedisAdapter(ctx, conf.Redis),
+		)
+		exec.Run(ctx, conf, *initChunkSize2)
 
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)

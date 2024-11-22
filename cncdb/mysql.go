@@ -297,6 +297,59 @@ func (ops *MySQLOps) GetUserQueryHistory(userID int, numItems int) ([]HistoryRec
 	return ans, nil
 }
 
+func (ops *MySQLOps) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+	rows, err := ops.db.QueryContext(
+		ops.ctx,
+		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
+			"WHERE user_id = ? AND created NOT IN "+
+			"(SELECT created FROM "+
+			"  ("+
+			"    SELECT created FROM kontext_query_history "+
+			"    WHERE user_id = ? ORDER BY created DESC LIMIT 500 "+
+			"  ) preserve "+
+			")",
+		userID, userID,
+	)
+	if err != nil {
+		return []HistoryRecord{}, fmt.Errorf("failed to get user garbage history: %w", err)
+	}
+	ans := make([]HistoryRecord, 0, 300)
+	for rows.Next() {
+		var hRec HistoryRecord
+		var name sql.NullString
+		err := rows.Scan(&hRec.UserID, &hRec.QueryID, &hRec.Created, &name)
+		if err != nil {
+			return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
+		}
+		hRec.Name = name.String
+		ans = append(ans, hRec)
+	}
+	return ans, nil
+}
+
+func (ops *MySQLOps) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+	res, err := ops.db.ExecContext(
+		ops.ctx,
+		"DELETE FROM kontext_query_history "+
+			"WHERE user_id = ? AND created NOT IN "+
+			"(SELECT created FROM "+
+			"  ("+
+			"    SELECT created FROM kontext_query_history "+
+			"    WHERE user_id = ? ORDER BY created DESC LIMIT 500 "+
+			"  ) preserve "+
+			")",
+		userID, userID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to garbage collect user query history: %w", err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return aff, fmt.Errorf("failed to garbage collect user query history: %w", err)
+	}
+	return aff, nil
+}
+
 func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
