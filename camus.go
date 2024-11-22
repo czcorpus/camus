@@ -21,6 +21,7 @@ import (
 	"camus/cleaner"
 	"camus/cncdb"
 	"camus/cnf"
+	"camus/history"
 	"camus/indexer"
 	"camus/reporting"
 	"context"
@@ -265,11 +266,12 @@ func main() {
 			return
 		}
 		log.Info().Msgf("using database %s@%s", conf.MySQL.Name, conf.MySQL.Host)
-		exec := dataInitializer{
-			db:  cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
-			rdb: archiver.NewRedisAdapter(ctx, conf.Redis),
-		}
-		exec.run(ctx, conf, *initChunkSize)
+		exec := history.NewDataInitializer(
+			cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
+			archiver.NewRedisAdapter(ctx, conf.Redis),
+		)
+		exec.Run(ctx, conf, *initChunkSize)
+	case "gc-query-history": // aka garbage-collect-query-history
 
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)

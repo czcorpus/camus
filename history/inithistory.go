@@ -1,4 +1,20 @@
-package main
+// Copyright 2024 Tomas Machalek <tomas.machalek@gmail.com>
+// Copyright 2024 Institute of the Czech National Corpus,
+//                Faculty of Arts, Charles University
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package history
 
 import (
 	"camus/archiver"
@@ -17,12 +33,12 @@ const (
 	usersProcSetKey = "camus_users_qh_init"
 )
 
-type dataInitializer struct {
+type DataInitializer struct {
 	db  cncdb.IMySQLOps
 	rdb *archiver.RedisAdapter
 }
 
-func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *indexer.Indexer) error {
+func (di *DataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *indexer.Indexer) error {
 	rec, err := di.rdb.GetConcRecord(hRec.QueryID)
 	if err == cncdb.ErrRecordNotFound {
 		recs, err := di.db.LoadRecordsByID(hRec.QueryID)
@@ -48,7 +64,7 @@ func (di *dataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *ind
 	return nil
 }
 
-func (di *dataInitializer) run(
+func (di *DataInitializer) Run(
 	ctx context.Context,
 	conf *cnf.Conf,
 	chunkSize int,
@@ -159,5 +175,15 @@ func (di *dataInitializer) run(
 			log.Error().Err(err).Msg("failed to write 'finished' record to Redis")
 			os.Exit(5)
 		}
+	}
+}
+
+func NewDataInitializer(
+	db cncdb.IMySQLOps,
+	rdb *archiver.RedisAdapter,
+) *DataInitializer {
+	return &DataInitializer{
+		db:  db,
+		rdb: rdb,
 	}
 }
