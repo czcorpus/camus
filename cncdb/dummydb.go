@@ -73,3 +73,11 @@ func (dsql *DummySQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRe
 func (dsql *DummySQL) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
+
+func (dsql *DummySQL) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+	return 0, nil
+}
+
+func (dsql *DummySQL) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+	return []HistoryRecord{}, nil
+}

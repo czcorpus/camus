@@ -51,5 +51,7 @@ type IMySQLOps interface {
 	GetAllUsersWithQueryHistory() ([]int, error)
 
 	GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error)
+	GarbageCollectUserQueryHistory(userID int) (int64, error)
+	GetUserGarbageHistory(userID int) ([]HistoryRecord, error)
 	LoadRecentNHistory(num int) ([]HistoryRecord, error)
 }
