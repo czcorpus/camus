@@ -17,83 +17,115 @@
 package cncdb
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-// MySQLDryRun is a dry-run mode version of mysql adapter. It performs
+// MySQLConcArchDryRun is a dry-run mode version of mysql adapter. It performs
 // read operations just like normal adapter but any modifying operation
 // just logs its information.
-type MySQLDryRun struct {
-	db *MySQLOps
+type MySQLConcArchDryRun struct {
+	db *MySQLConcArch
 }
 
-func (db *MySQLDryRun) LoadRecentNRecords(num int) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) NewTransaction() (*sql.Tx, error) {
+	return db.db.NewTransaction()
+}
+
+func (db *MySQLConcArchDryRun) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	return db.db.LoadRecentNRecords(num)
 }
 
-func (db *MySQLDryRun) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
 	return db.db.LoadRecordsFromDate(fromDate, maxItems)
 }
 
-func (db *MySQLDryRun) ContainsRecord(concID string) (bool, error) {
+func (db *MySQLConcArchDryRun) ContainsRecord(concID string) (bool, error) {
 	return db.db.ContainsRecord(concID)
 }
 
-func (db *MySQLDryRun) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	return db.db.LoadRecordsByID(concID)
 }
 
-func (db *MySQLDryRun) InsertRecord(rec ArchRecord) error {
+func (db *MySQLConcArchDryRun) InsertRecord(rec ArchRecord) error {
 	log.Info().Msgf("DRY-RUN>>> InsertRecord(ArchRecord{ID: %s})", rec.ID)
 	return nil
 }
 
-func (db *MySQLDryRun) UpdateRecordStatus(id string, status int) error {
+func (db *MySQLConcArchDryRun) UpdateRecordStatus(id string, status int) error {
 	log.Info().Msgf("DRY-RUN>>> UpdateRecordStatus(%s, %d)", id, status)
 	return nil
 }
 
-func (db *MySQLDryRun) RemoveRecordsByID(concID string) error {
+func (db *MySQLConcArchDryRun) RemoveRecordsByID(concID string) error {
 	log.Info().Msgf("DRY-RUN>>> RemoveRecordsByID(%s)", concID)
 	return nil
 }
 
-func (db *MySQLDryRun) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+func (db *MySQLConcArchDryRun) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
 	log.Info().Msgf("DRY-RUN>>> DeduplicateInArchive(..., ArchRecord{ID: %s})", rec.ID)
 	return ArchRecord{}, nil
 }
 
-func (ops *MySQLDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
+func (ops *MySQLConcArchDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ops.db.GetArchSizesByYears(forceLoad)
 }
 
-func (ops *MySQLDryRun) GetSubcorpusProps(subcID string) (SubcProps, error) {
+func (ops *MySQLConcArchDryRun) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	return ops.db.GetSubcorpusProps(subcID)
 }
 
-func (ops *MySQLDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
+// --------------------------------------------------------------
+
+// MySQLQueryHistDryRun is a dry-run mode version of mysql adapter. It performs
+// read operations just like normal adapter but any modifying operation
+// just logs its information.
+type MySQLQueryHistDryRun struct {
+	db *MySQLQueryHist
+}
+
+func (ops *MySQLQueryHistDryRun) NewTransaction() (*sql.Tx, error) {
+	return ops.db.NewTransaction()
+}
+
+func (ops *MySQLQueryHistDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ops.db.GetAllUsersWithQueryHistory()
 }
 
-func (ops *MySQLDryRun) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHistDryRun) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	return ops.db.GetUserQueryHistory(userID, numItems)
 }
 
-func (db *MySQLDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHistDryRun) MarkOldQueryHistory(numPreserve int) (int64, error) {
+	log.Info().Msgf("DRY-RUN>>> MarkOldQueryHistory(%d)", numPreserve)
+	return 0, nil
+}
+
+func (db *MySQLQueryHistDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return db.db.LoadRecentNHistory(num)
 }
 
-func (db *MySQLDryRun) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+func (db *MySQLQueryHistDryRun) GarbageCollectUserQueryHistory(userID int) (int64, error) {
 	log.Info().Msgf("DRY-RUN>>> GarbageCollectUserQueryHistory(%d)", userID)
 	return 0, nil
 }
 
-func (db *MySQLDryRun) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+func (db *MySQLQueryHistDryRun) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
 	return db.db.GetUserGarbageHistory(userID)
 }
 
-func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {
-	return &MySQLDryRun{db: ops}
+func (db *MySQLQueryHistDryRun) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	log.Info().Msgf("DRY-RUN>>> RemoveQueryHistory(%d, %d, %s)", created, userID, queryID)
+	return nil
+}
+
+func (db *MySQLQueryHistDryRun) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+	return db.db.GetPendingDeletionHistory(tx, maxItems)
+}
+
+func NewMySQLDryRun(opsArch *MySQLConcArch, opsHist *MySQLQueryHist) (*MySQLConcArchDryRun, *MySQLQueryHistDryRun) {
+	return &MySQLConcArchDryRun{db: opsArch}, &MySQLQueryHistDryRun{db: opsHist}
 }

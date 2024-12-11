@@ -48,8 +48,7 @@ func (job *ArchKeeper) YearsStats(forceReload bool) (YearsStats, error) {
 		}
 	}
 	if cached == "" {
-		fmt.Println("NO CACHE____")
-		data, err := job.db.GetArchSizesByYears(forceReload)
+		data, err := job.dbArch.GetArchSizesByYears(forceReload)
 		if err == cncdb.ErrTooDemandingQuery {
 			return ans, nil
 

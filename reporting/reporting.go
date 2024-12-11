@@ -18,7 +18,6 @@ package reporting
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/czcorpus/hltscl"
@@ -33,7 +32,8 @@ create table camus_operations_stats (
   num_fetched int,
   num_errors int,
   num_merged int,
-  num_inserted int
+  num_inserted int,
+  index_size int
 );
 
 select create_hypertable('camus_operations_stats', 'time');
@@ -48,15 +48,26 @@ create table camus_cleanup_stats (
 
 select create_hypertable('camus_cleanup_stats', 'time');
 
+create table camus_query_history_deletion_stats (
+  "time" timestamp with time zone NOT NULL,
+  num_deleted int,
+  index_size int,
+  num_errors int
+);
+
+select create_hypertable('camus_query_history_deletion_stats', 'time');
+
 */
 
 type StatusWriter struct {
-	tableWriterOps     *hltscl.TableWriter
-	tableWriterCleanup *hltscl.TableWriter
-	opsDataCh          chan<- hltscl.Entry
-	cleanupDataCh      chan<- hltscl.Entry
-	errCh              <-chan hltscl.WriteError
-	location           *time.Location
+	tableWriterOps        *hltscl.TableWriter
+	tableWriterCleanup    *hltscl.TableWriter
+	tableWriterQHDelStats *hltscl.TableWriter
+	opsDataCh             chan<- hltscl.Entry
+	cleanupDataCh         chan<- hltscl.Entry
+	indexInfoDataCh       chan<- hltscl.Entry
+	errCh                 <-chan hltscl.WriteError
+	location              *time.Location
 }
 
 func (job *StatusWriter) Start(ctx context.Context) {
@@ -71,7 +82,6 @@ func (job *StatusWriter) Start(ctx context.Context) {
 					Err(err.Err).
 					Str("entry", err.Entry.String()).
 					Msg("error writing data to TimescaleDB")
-				fmt.Println("reporting timescale write err: ", err.Err)
 			}
 		}
 	}()
@@ -94,12 +104,20 @@ func (ds *StatusWriter) WriteOperationsStatus(item OpStats) {
 
 func (ds *StatusWriter) WriteCleanupStatus(item CleanupStats) {
 	if ds.tableWriterCleanup != nil {
-		fmt.Println("writing data")
 		ds.cleanupDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
 			Int("num_errors", item.NumErrors).
 			Int("num_fetched", item.NumFetched).
 			Int("num_merged", item.NumMerged).
 			Int("num_deleted", item.NumDeleted)
+	}
+}
+
+func (ds *StatusWriter) WriteQueryHistoryDeletionStatus(item QueryHistoryDelStats) {
+	if ds.tableWriterQHDelStats != nil {
+		ds.indexInfoDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
+			Int("index_size", int(item.IndexSize)).
+			Int("num_deleted", item.NumDeleted).
+			Int("num_errors", item.NumErrors)
 	}
 }
 
@@ -113,6 +131,8 @@ func NewStatusWriter(conf hltscl.PgConf, tz *time.Location, onError func(err err
 	opsDataCh, errCh1 := twriter1.Activate()
 	twriter2 := hltscl.NewTableWriter(conn, "camus_cleanup_stats", "time", tz)
 	cleanupDataCh, errCh2 := twriter2.Activate()
+	twriter3 := hltscl.NewTableWriter(conn, "camus_query_history_deletion_stats", "time", tz)
+	indexInfoDataCh, errCh3 := twriter3.Activate()
 	mergedErr := make(chan hltscl.WriteError)
 	go func() {
 		for err := range errCh1 {
@@ -124,13 +144,20 @@ func NewStatusWriter(conf hltscl.PgConf, tz *time.Location, onError func(err err
 			mergedErr <- err
 		}
 	}()
+	go func() {
+		for err := range errCh3 {
+			mergedErr <- err
+		}
+	}()
 
 	return &StatusWriter{
-		tableWriterOps:     twriter1,
-		tableWriterCleanup: twriter2,
-		opsDataCh:          opsDataCh,
-		cleanupDataCh:      cleanupDataCh,
-		errCh:              mergedErr,
-		location:           tz,
+		tableWriterOps:        twriter1,
+		tableWriterCleanup:    twriter2,
+		tableWriterQHDelStats: twriter3,
+		opsDataCh:             opsDataCh,
+		cleanupDataCh:         cleanupDataCh,
+		indexInfoDataCh:       indexInfoDataCh,
+		errCh:                 mergedErr,
+		location:              tz,
 	}, nil
 }

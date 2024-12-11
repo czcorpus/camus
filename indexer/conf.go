@@ -18,14 +18,64 @@ package indexer
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/czcorpus/cnc-gokit/datetime"
 	"github.com/czcorpus/cnc-gokit/fs"
 )
 
+// Conf contains indexer's configuration as obtained
+// from a JSON file (or chunk). Please note that the
+// instance should be treated as ready only after
+// ValidateAndDefaults is called. Otherwise, it may
+// provide incorrect or inconsistent data.
 type Conf struct {
-	IndexDirPath           string `json:"indexDirPath"`
-	DocRemoveChannel       string `json:"docRemoveChannel"`
-	KonTextHistoryNumItems int    `json:"konTextHistoryNumItems"`
+
+	// IndexDirPath specifies a directory where Bleve stores
+	// its fulltext index data
+	IndexDirPath string `json:"indexDirPath"`
+
+	// QueryHistoryNumPreserve specifies how many items we allow
+	// in query history for an individual user. Anything above that
+	// level is then considered deletable at any time
+	// (see QueryHistoryCleanupInterval and QueryHistoryMarkPendingInterval)
+	QueryHistoryNumPreserve int `json:"queryHistoryNumPreserve"`
+
+	// QueryHistoryCleanupInterval is a string encoded (10s, 1m, 5m30s etc.)
+	// interval specifying how often will Camus look for outdated/excessing
+	// records for each user.
+	QueryHistoryCleanupInterval string `json:"queryHistoryCleanupInterval"`
+
+	// QueryHistoryMarkPendingInterval specifies interval between actions
+	// when Camus searches for query history records we can delete.
+	// This interval should be longer than QueryHistoryCleanupInterval.
+	// Typically - items for deletion can be marked once a day and then,
+	// Camus will try to delete items in database and in fulltext chunk by chunk.
+	// Both values should be tuned in a way preventing fulltext and database
+	// from growing indefinitely
+	QueryHistoryMarkPendingInterval string `json:"queryHistoryMarkPendingInterval"`
+
+	QueryHistoryMaxNumDeleteAtOnce int `json:"queryHistoryMaxNumDeleteAtOnce"`
+}
+
+func (conf *Conf) QueryHistoryCleanupIntervalDur() time.Duration {
+	dur, err := datetime.ParseDuration(conf.QueryHistoryCleanupInterval)
+	if err != nil {
+		panic(err) // we expect users to call ValidateAndDefaults() which
+		// checks for this too in a more graceful way so we can afford
+		// to panic here
+	}
+	return dur
+}
+
+func (conf *Conf) QueryHistoryMarkPendingIntervalDur() time.Duration {
+	dur, err := datetime.ParseDuration(conf.QueryHistoryMarkPendingInterval)
+	if err != nil {
+		panic(err) // we expect users to call ValidateAndDefaults() which
+		// checks for this too in a more graceful way so we can afford
+		// to panic here
+	}
+	return dur
 }
 
 func (conf *Conf) ValidateAndDefaults() error {
@@ -40,6 +90,28 @@ func (conf *Conf) ValidateAndDefaults() error {
 		return err
 	} else if !isDir {
 		return fmt.Errorf("index dir does not exist (indexDirPath)")
+	}
+	if conf.QueryHistoryNumPreserve <= 0 {
+		return fmt.Errorf("queryHistoryNumPreserve not specified (recommended > 100)")
+	}
+	if dur, err := datetime.ParseDuration(conf.QueryHistoryCleanupInterval); err != nil || dur == 0 {
+		if err != nil {
+			return fmt.Errorf("failed to validate queryHistoryCleanupInterval: %w", err)
+		}
+		if dur == 0 {
+			return fmt.Errorf("queryHistoryCleanupInterval must be > 0")
+		}
+	}
+	if dur, err := datetime.ParseDuration(conf.QueryHistoryMarkPendingInterval); err != nil || dur == 0 {
+		if err != nil {
+			return fmt.Errorf("failed to validate queryHistoryMarkPendingInterval: %w", err)
+		}
+		if dur == 0 {
+			return fmt.Errorf("queryHistoryMarkPendingInterval must be > 0")
+		}
+	}
+	if conf.QueryHistoryMaxNumDeleteAtOnce <= 0 {
+		return fmt.Errorf("queryHistoryMaxNumDeleteAtOnce must be > 0")
 	}
 	return nil
 }

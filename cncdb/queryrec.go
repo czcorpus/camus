@@ -154,6 +154,6 @@ func (qr *UntypedQueryRecord) GetSupertype() (QuerySupertype, error) {
 	return st, nil
 }
 
-func (qr *UntypedQueryRecord) GetSubcorpus(db IMySQLOps) (SubcProps, error) {
+func (qr *UntypedQueryRecord) GetSubcorpus(db IConcArchOps) (SubcProps, error) {
 	return db.GetSubcorpusProps(qr.SubcorpusID)
 }

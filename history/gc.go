@@ -21,23 +21,156 @@ import (
 	"camus/cncdb"
 	"camus/cnf"
 	"camus/indexer"
+	"camus/reporting"
 	"context"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 const (
-	gcUsersProcSetKey = "camus_users_qh_gc"
+	gcUsersProcSetKey      = "camus_users_qh_gc"
+	timeWaitAfterDelErrors = 5 * time.Minute
 )
 
 type GarbageCollector struct {
-	db  cncdb.IMySQLOps
-	rdb *archiver.RedisAdapter
+	db            cncdb.IQHistArchOps
+	rdb           *archiver.RedisAdapter
+	checkInterval time.Duration
+	markInterval  time.Duration
+	numPreserve   int
+	maxNumDelete  int
+	indexer       *indexer.Indexer
+	statusWriter  reporting.IReporting
 }
 
-func (gc *GarbageCollector) Run(
+func (gc *GarbageCollector) Start(ctx context.Context) {
+	log.Info().
+		Str("rmCheckInterval", gc.checkInterval.String()).
+		Msg("starting history.GarbageCollector task")
+
+	timer := time.NewTimer(gc.checkInterval)
+	markerTimer := time.NewTicker(gc.markInterval)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info().Msg("about to close fulltext Service")
+				return
+			case <-markerTimer.C:
+				gc.createPendingRecords()
+			case <-timer.C:
+				indexSize, err := gc.indexer.Count()
+				if err != nil {
+					log.Error().Err(err).Msg("failed to obtain fulltext index size")
+				}
+				delStats := gc.processDeletionPendingRecords()
+				if err == nil {
+					delStats.IndexSize = int64(indexSize)
+
+				} else {
+					delStats.NumErrors++
+				}
+				gc.statusWriter.WriteQueryHistoryDeletionStatus(delStats)
+
+				if delStats.NumErrors == 0 {
+					timer = time.NewTimer(gc.checkInterval)
+
+				} else {
+					go func() {
+						log.Error().
+							Msgf(
+								"errors in deleting of pending records - going to wait %01.1f minutes then continue",
+								timeWaitAfterDelErrors.Seconds(),
+							)
+						time.Sleep(timeWaitAfterDelErrors)
+						timer = time.NewTimer(gc.checkInterval)
+					}()
+				}
+			}
+		}
+	}()
+}
+
+func (gc *GarbageCollector) createPendingRecords() {
+	numRm, err := gc.db.MarkOldQueryHistory(gc.numPreserve)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("failed to mark kontext_query_history records for deletion (will try again)")
+
+	} else {
+		log.Info().
+			Int64("numMarked", numRm).
+			Msg("marked next set of kontext_query_history records for deletion")
+	}
+}
+
+// processDeletionPendingRecords returns status whether we are allowed
+// to run a new timer to process the next batch of records.
+func (gc *GarbageCollector) processDeletionPendingRecords() reporting.QueryHistoryDelStats {
+	log.Debug().Msg("retrieving next query history data with pending deletion")
+	tx, err := gc.db.NewTransaction()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to retrieve next query history data with pending deletion")
+		return reporting.QueryHistoryDelStats{NumErrors: 1}
+	}
+	recs, err := gc.db.GetPendingDeletionHistory(tx, gc.maxNumDelete)
+	log.Debug().
+		Int("maxLimit", gc.maxNumDelete).
+		Int("numRecords", len(recs)).
+		Msg("searched query history records for deletion")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to retrieve next query history data with pending deletion")
+		if err := tx.Rollback(); err != nil {
+			log.Error().Err(err).Msg("failed to rollback transaction")
+		}
+		return reporting.QueryHistoryDelStats{NumErrors: 1}
+	}
+	for _, rec := range recs {
+		if err := gc.db.RemoveQueryHistory(tx, rec.Created, rec.UserID, rec.QueryID); err != nil {
+			log.Error().
+				Int64("created", rec.Created).
+				Int("userId", rec.UserID).
+				Str("queryId", rec.QueryID).
+				Err(err).
+				Msg("failed to remove query history item")
+			if err := tx.Rollback(); err != nil {
+				log.Error().Err(err).Msg("failed to rollback transaction")
+			}
+			return reporting.QueryHistoryDelStats{NumErrors: 1}
+		}
+		if err := gc.indexer.Delete(rec.CreateIndexID()); err != nil {
+			log.Error().
+				Int64("created", rec.Created).
+				Int("userId", rec.UserID).
+				Str("queryId", rec.QueryID).
+				Err(err).
+				Msg("failed to delete item from Bleve index")
+			if err := tx.Rollback(); err != nil {
+				log.Error().Err(err).Msg("failed to rollback transaction")
+			}
+			return reporting.QueryHistoryDelStats{NumErrors: 1}
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		log.Error().
+			Err(err).
+			Msg("failed to commit transaction in processDeletionPendingRecords")
+		return reporting.QueryHistoryDelStats{NumErrors: 1}
+	}
+
+	return reporting.QueryHistoryDelStats{NumDeleted: len(recs)}
+}
+
+func (gc *GarbageCollector) Stop(ctx context.Context) error {
+	return nil
+}
+
+func (gc *GarbageCollector) RunAdHoc(
 	ctx context.Context,
+	concArchDb cncdb.IConcArchOps,
 	conf *cnf.Conf,
 	chunkSize int,
 ) {
@@ -64,7 +197,7 @@ func (gc *GarbageCollector) Run(
 	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
 
-	ftIndexer, err := indexer.NewIndexerOrDie(conf.Indexer, gc.db, gc.rdb, recsToIndex)
+	ftIndexer, err := indexer.NewIndexerOrDie(conf.Indexer, concArchDb, gc.db, gc.rdb, recsToIndex)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init query history")
 		os.Exit(3)
@@ -137,11 +270,19 @@ func (gc *GarbageCollector) Run(
 }
 
 func NewGarbageCollector(
-	db cncdb.IMySQLOps,
+	db cncdb.IQHistArchOps,
 	rdb *archiver.RedisAdapter,
+	fulltext *indexer.Indexer,
+	statusWriter reporting.IReporting,
+	conf *indexer.Conf,
 ) *GarbageCollector {
 	return &GarbageCollector{
-		db:  db,
-		rdb: rdb,
+		db:            db,
+		rdb:           rdb,
+		indexer:       fulltext,
+		statusWriter:  statusWriter,
+		checkInterval: conf.QueryHistoryCleanupIntervalDur(),
+		markInterval:  conf.QueryHistoryMarkPendingIntervalDur(),
+		maxNumDelete:  conf.QueryHistoryMaxNumDeleteAtOnce,
 	}
 }

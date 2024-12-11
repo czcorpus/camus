@@ -16,68 +16,92 @@
 
 package cncdb
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
-// DummySQL is a testing implementation of IMySQLOps
-type DummySQL struct {
+// DummyConcArchSQL is a testing implementation of IMySQLOps
+type DummyConcArchSQL struct {
 }
 
-func (dsql *DummySQL) LoadRecentNRecords(num int) ([]ArchRecord, error) {
+func (dsql *DummyConcArchSQL) NewTransaction() (*sql.Tx, error) {
+	return nil, nil
+}
+
+func (dsql *DummyConcArchSQL) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	return []ArchRecord{}, nil
 }
 
-func (dsql *DummySQL) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+func (dsql *DummyConcArchSQL) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
 	return []ArchRecord{}, nil
 }
 
-func (dsql *DummySQL) ContainsRecord(concID string) (bool, error) {
+func (dsql *DummyConcArchSQL) ContainsRecord(concID string) (bool, error) {
 	return false, nil
 }
 
-func (dsql *DummySQL) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+func (dsql *DummyConcArchSQL) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	return []ArchRecord{}, nil
 }
 
-func (dsql *DummySQL) InsertRecord(rec ArchRecord) error {
+func (dsql *DummyConcArchSQL) InsertRecord(rec ArchRecord) error {
 	return nil
 }
 
-func (dsql *DummySQL) UpdateRecordStatus(id string, status int) error {
+func (dsql *DummyConcArchSQL) UpdateRecordStatus(id string, status int) error {
 	return nil
 }
 
-func (dsql *DummySQL) RemoveRecordsByID(concID string) error {
+func (dsql *DummyConcArchSQL) RemoveRecordsByID(concID string) error {
 	return nil
 }
 
-func (dsql *DummySQL) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+func (dsql *DummyConcArchSQL) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
 	return ArchRecord{}, nil
 }
 
-func (dsql *DummySQL) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
+func (dsql *DummyConcArchSQL) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return [][2]int{}, nil
 }
 
-func (dsql *DummySQL) GetSubcorpusProps(subcID string) (SubcProps, error) {
+func (dsql *DummyConcArchSQL) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	return SubcProps{}, nil
 }
 
-func (dsql *DummySQL) GetAllUsersWithQueryHistory() ([]int, error) {
+// ----------------------------------------
+
+// DummyQHistSQL is a testing implementation of IMySQLOps
+type DummyQHistSQL struct {
+}
+
+func (dsql *DummyQHistSQL) GetAllUsersWithQueryHistory() ([]int, error) {
 	return []int{}, nil
 }
 
-func (dsql *DummySQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+func (dsql *DummyQHistSQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
 
-func (dsql *DummySQL) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
-	return []HistoryRecord{}, nil
-}
-
-func (dsql *DummySQL) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+func (dsql *DummyQHistSQL) MarkOldQueryHistory(numPreserve int) (int64, error) {
 	return 0, nil
 }
 
-func (dsql *DummySQL) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+func (dsql *DummyQHistSQL) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
+	return []HistoryRecord{}, nil
+}
+
+func (dsql *DummyQHistSQL) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+	return 0, nil
+}
+
+func (dsql *DummyQHistSQL) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+	return []HistoryRecord{}, nil
+}
+func (dsql *DummyQHistSQL) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	return nil
+}
+
+func (dsql *DummyQHistSQL) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }

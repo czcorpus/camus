@@ -59,6 +59,6 @@ func (qr *unspecifiedQueryRecord) GetSupertype() (cncdb.QuerySupertype, error) {
 	return st, nil
 }
 
-func (qr *unspecifiedQueryRecord) GetSubcorpusProps(db cncdb.IMySQLOps) (cncdb.SubcProps, error) {
+func (qr *unspecifiedQueryRecord) GetSubcorpusProps(db cncdb.IConcArchOps) (cncdb.SubcProps, error) {
 	return db.GetSubcorpusProps(qr.SubcorpusID)
 }

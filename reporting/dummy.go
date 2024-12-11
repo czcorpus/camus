@@ -46,3 +46,7 @@ func (job *DummyWriter) WriteOperationsStatus(item OpStats) {
 func (job *DummyWriter) WriteCleanupStatus(item CleanupStats) {
 	log.Info().Any("stats", item).Msg("writing dummy cleanup report")
 }
+
+func (job *DummyWriter) WriteQueryHistoryDeletionStatus(item QueryHistoryDelStats) {
+	log.Info().Any("stats", item).Msg("writing dummy query history deletion report")
+}

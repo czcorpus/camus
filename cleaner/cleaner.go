@@ -34,7 +34,7 @@ const (
 
 type Service struct {
 	conf           Conf
-	db             cncdb.IMySQLOps
+	db             cncdb.IConcArchOps
 	rdb            *archiver.RedisAdapter
 	tz             *time.Location
 	cleanupRunning bool
@@ -210,7 +210,7 @@ func (job *Service) performCleanup(itemsToProc int) error {
 }
 
 func NewService(
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 	rdb *archiver.RedisAdapter,
 	reporting reporting.IReporting,
 	conf Conf,

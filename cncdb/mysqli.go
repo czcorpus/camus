@@ -16,17 +16,20 @@
 
 package cncdb
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type SubcProps struct {
 	Name      string
 	TextTypes map[string][]string
 }
 
-// IMySQLOps is an abstract interface for high level
-// database operations. We need it mainly to allow
-// injecting "dummy" database adapter for "dry-run" mode.
-type IMySQLOps interface {
+// IConcArchOps is an abstract interface for high level
+// database operations for concordance archive.
+type IConcArchOps interface {
+	NewTransaction() (*sql.Tx, error)
 	LoadRecentNRecords(num int) ([]ArchRecord, error)
 	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error)
 	ContainsRecord(concID string) (bool, error)
@@ -47,11 +50,20 @@ type IMySQLOps interface {
 	// The method should accept empty value by responding
 	// with empty value (and without error).
 	GetSubcorpusProps(subcID string) (SubcProps, error)
+}
 
+type IQHistArchOps interface {
+	NewTransaction() (*sql.Tx, error)
 	GetAllUsersWithQueryHistory() ([]int, error)
 
 	GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error)
+	MarkOldQueryHistory(numPreserve int) (int64, error)
 	GarbageCollectUserQueryHistory(userID int) (int64, error)
 	GetUserGarbageHistory(userID int) ([]HistoryRecord, error)
+	RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error
+
+	// GetPendingDeletionHistory should return records with oldest
+	// pending deletion time.
+	GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error)
 	LoadRecentNHistory(num int) ([]HistoryRecord, error)
 }

@@ -62,6 +62,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	indexerHandler := indexer.NewActions(api.fulltextService)
 	engine.GET("/query-history/build", indexerHandler.IndexLatestRecords)
 	engine.GET("/query-history/rec2doc", indexerHandler.RecordToDoc)
+	engine.GET("/query-history/index-info", indexerHandler.IndexInfo)
 	engine.POST("/user-query-history/:userId", indexerHandler.Search)
 	engine.POST("/user-query-history/:userId/:queryId/:created", indexerHandler.Update)
 	engine.DELETE("/user-query-history/:userId/:queryId/:created", indexerHandler.Delete)
@@ -74,6 +75,10 @@ func (api *apiServer) Start(ctx context.Context) {
 	}
 
 	go func() {
+		log.Info().
+			Str("address", api.conf.ListenAddress).
+			Int("Port", api.conf.ListenPort).
+			Msg("starting HTTP server")
 		if err := api.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("server error")
 		}

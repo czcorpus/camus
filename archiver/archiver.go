@@ -44,7 +44,7 @@ import (
 // is reasonably large.
 type ArchKeeper struct {
 	redis       *RedisAdapter
-	db          cncdb.IMySQLOps
+	dbArch      cncdb.IConcArchOps
 	reporting   reporting.IReporting
 	conf        *Conf
 	dedup       *Deduplicator
@@ -101,7 +101,7 @@ func (job *ArchKeeper) GetStats() reporting.OpStats {
 }
 
 func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error) {
-	return job.db.LoadRecordsByID(concID)
+	return job.dbArch.LoadRecordsByID(concID)
 }
 
 // handleImplicitReq returns true if everything was ok, otherwise
@@ -128,7 +128,7 @@ func (job *ArchKeeper) handleImplicitReq(
 		currStats.NumMerged++
 		return true
 	}
-	if err := job.db.InsertRecord(rec); err != nil {
+	if err := job.dbArch.InsertRecord(rec); err != nil {
 		log.Error().
 			Err(err).
 			Str("recordId", item.Key).
@@ -144,7 +144,7 @@ func (job *ArchKeeper) handleImplicitReq(
 
 func (job *ArchKeeper) handleExplicitReq(
 	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) {
-	exists, err := job.db.ContainsRecord(rec.ID)
+	exists, err := job.dbArch.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
 		log.Error().
@@ -153,7 +153,7 @@ func (job *ArchKeeper) handleExplicitReq(
 			Msg("failed to test record existence, skipping")
 	}
 	if !exists {
-		err := job.db.InsertRecord(rec)
+		err := job.dbArch.InsertRecord(rec)
 		if err != nil {
 			currStats.NumErrors++
 			log.Error().
@@ -228,12 +228,12 @@ func (job *ArchKeeper) performCheck() error {
 
 func (job *ArchKeeper) DeduplicateInArchive(
 	curr []cncdb.ArchRecord, rec cncdb.ArchRecord) (cncdb.ArchRecord, error) {
-	return job.db.DeduplicateInArchive(curr, rec)
+	return job.dbArch.DeduplicateInArchive(curr, rec)
 }
 
 func NewArchKeeper(
 	redis *RedisAdapter,
-	db cncdb.IMySQLOps,
+	concArchDb cncdb.IConcArchOps,
 	dedup *Deduplicator,
 	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
@@ -242,7 +242,7 @@ func NewArchKeeper(
 ) *ArchKeeper {
 	return &ArchKeeper{
 		redis:       redis,
-		db:          db,
+		dbArch:      concArchDb,
 		dedup:       dedup,
 		recsToIndex: recsToIndex,
 		reporting:   reporting,

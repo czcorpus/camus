@@ -34,14 +34,15 @@ const (
 )
 
 type DataInitializer struct {
-	db  cncdb.IMySQLOps
-	rdb *archiver.RedisAdapter
+	concArchDb  cncdb.IConcArchOps
+	queryHistDb cncdb.IQHistArchOps
+	rdb         *archiver.RedisAdapter
 }
 
 func (di *DataInitializer) processQuery(hRec cncdb.HistoryRecord, ftIndexer *indexer.Indexer) error {
 	rec, err := di.rdb.GetConcRecord(hRec.QueryID)
 	if err == cncdb.ErrRecordNotFound {
-		recs, err := di.db.LoadRecordsByID(hRec.QueryID)
+		recs, err := di.concArchDb.LoadRecordsByID(hRec.QueryID)
 		if err != nil {
 			return fmt.Errorf("failed to load query %s from MySQL: %w", hRec.QueryID, err)
 		}
@@ -94,7 +95,7 @@ func (di *DataInitializer) Run(
 	}
 	if !cacheExists {
 		log.Info().Msg("processed user IDs not found - will create a new set")
-		users, err := di.db.GetAllUsersWithQueryHistory()
+		users, err := di.queryHistDb.GetAllUsersWithQueryHistory()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to init query history")
 			os.Exit(2)
@@ -108,7 +109,7 @@ func (di *DataInitializer) Run(
 	recsToIndex := make(chan cncdb.HistoryRecord)
 	defer func() { close(recsToIndex) }()
 
-	ftIndexer, err := indexer.NewIndexerOrDie(conf.Indexer, di.db, di.rdb, recsToIndex)
+	ftIndexer, err := indexer.NewIndexerOrDie(conf.Indexer, di.concArchDb, di.queryHistDb, di.rdb, recsToIndex)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to init query history")
 		os.Exit(3)
@@ -126,7 +127,7 @@ func (di *DataInitializer) Run(
 			finishedAllChunks = true
 			break
 		}
-		qIDs, err := di.db.GetUserQueryHistory(nextUserID, conf.Indexer.KonTextHistoryNumItems)
+		qIDs, err := di.queryHistDb.GetUserQueryHistory(nextUserID, conf.Indexer.QueryHistoryNumPreserve)
 		log.Info().
 			Int("userId", nextUserID).
 			Err(err).
@@ -179,11 +180,13 @@ func (di *DataInitializer) Run(
 }
 
 func NewDataInitializer(
-	db cncdb.IMySQLOps,
+	concArchDb cncdb.IConcArchOps,
+	queryHistDb cncdb.IQHistArchOps,
 	rdb *archiver.RedisAdapter,
 ) *DataInitializer {
 	return &DataInitializer{
-		db:  db,
-		rdb: rdb,
+		concArchDb:  concArchDb,
+		queryHistDb: queryHistDb,
+		rdb:         rdb,
 	}
 }
