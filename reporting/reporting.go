@@ -34,6 +34,7 @@ create table camus_operations_stats (
   num_errors int,
   num_merged int,
   num_inserted int
+  index_size int
 );
 
 select create_hypertable('camus_operations_stats', 'time');
@@ -48,15 +49,24 @@ create table camus_cleanup_stats (
 
 select create_hypertable('camus_cleanup_stats', 'time');
 
+create table camus_index_stats (
+  "time" timestamp with time zone NOT NULL,
+  index_size int
+);
+
+select create_hypertable('camus_index_stats', 'time');
+
 */
 
 type StatusWriter struct {
-	tableWriterOps     *hltscl.TableWriter
-	tableWriterCleanup *hltscl.TableWriter
-	opsDataCh          chan<- hltscl.Entry
-	cleanupDataCh      chan<- hltscl.Entry
-	errCh              <-chan hltscl.WriteError
-	location           *time.Location
+	tableWriterOps        *hltscl.TableWriter
+	tableWriterCleanup    *hltscl.TableWriter
+	tableWriterIndexStats *hltscl.TableWriter
+	opsDataCh             chan<- hltscl.Entry
+	cleanupDataCh         chan<- hltscl.Entry
+	indexInfoDataCh       chan<- hltscl.Entry
+	errCh                 <-chan hltscl.WriteError
+	location              *time.Location
 }
 
 func (job *StatusWriter) Start(ctx context.Context) {
@@ -94,12 +104,18 @@ func (ds *StatusWriter) WriteOperationsStatus(item OpStats) {
 
 func (ds *StatusWriter) WriteCleanupStatus(item CleanupStats) {
 	if ds.tableWriterCleanup != nil {
-		fmt.Println("writing data")
 		ds.cleanupDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
 			Int("num_errors", item.NumErrors).
 			Int("num_fetched", item.NumFetched).
 			Int("num_merged", item.NumMerged).
 			Int("num_deleted", item.NumDeleted)
+	}
+}
+
+func (ds *StatusWriter) WriteIndexStats(item IndexStats) {
+	if ds.tableWriterIndexStats != nil {
+		ds.indexInfoDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
+			Int("index_size", item.IndexSize)
 	}
 }
 
@@ -113,6 +129,8 @@ func NewStatusWriter(conf hltscl.PgConf, tz *time.Location, onError func(err err
 	opsDataCh, errCh1 := twriter1.Activate()
 	twriter2 := hltscl.NewTableWriter(conn, "camus_cleanup_stats", "time", tz)
 	cleanupDataCh, errCh2 := twriter2.Activate()
+	twriter3 := hltscl.NewTableWriter(conn, "camus_index_stats", "time", tz)
+	indexInfoDataCh, errCh3 := twriter3.Activate()
 	mergedErr := make(chan hltscl.WriteError)
 	go func() {
 		for err := range errCh1 {
@@ -124,12 +142,18 @@ func NewStatusWriter(conf hltscl.PgConf, tz *time.Location, onError func(err err
 			mergedErr <- err
 		}
 	}()
+	go func() {
+		for err := range errCh3 {
+			mergedErr <- err
+		}
+	}()
 
 	return &StatusWriter{
 		tableWriterOps:     twriter1,
 		tableWriterCleanup: twriter2,
 		opsDataCh:          opsDataCh,
 		cleanupDataCh:      cleanupDataCh,
+		indexInfoDataCh:    indexInfoDataCh,
 		errCh:              mergedErr,
 		location:           tz,
 	}, nil

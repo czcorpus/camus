@@ -49,6 +49,12 @@ type CleanupStats struct {
 
 // ------------
 
+type IndexStats struct {
+	IndexSize int `json:"indexSize"`
+}
+
+// ------------
+
 type IReporting interface {
 	Start(ctx context.Context)
 	Stop(ctx context.Context) error

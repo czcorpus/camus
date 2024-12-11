@@ -76,6 +76,10 @@ type MySQLOps struct {
 	ctx context.Context
 }
 
+func (ops *MySQLOps) NewTransaction() (*sql.Tx, error) {
+	return ops.db.BeginTx(ops.ctx, nil)
+}
+
 func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
@@ -269,6 +273,34 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
+func (ops *MySQLOps) MarkOldQueryHistory(numPreserve int) (int64, error) {
+	res, err := ops.db.ExecContext(
+		ops.ctx,
+		"UPDATE kontext_query_history AS qh JOIN "+
+			"( "+
+			"SELECT user_id, created, query_id "+
+			"FROM ( "+
+			"  SELECT user_id, created, query_id, "+
+			"  ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created DESC) AS row_num "+
+			"  FROM kontext_query_history "+
+			"  WHERE name is NULL "+
+			") AS tmp "+
+			"WHERE row_num > ? "+
+			"ORDER BY created "+
+			") AS du "+
+			"ON qh.user_id = du.user_id AND qh.created = du.created AND qh.query_id = du.query_id "+
+			"SET qh.pending_deletion_from = NOW() ",
+	)
+	if err != nil {
+		return -1, fmt.Errorf("failed to mark old query history records: %w", err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return -1, fmt.Errorf("failed to mark old query history records: %w", err)
+	}
+	return aff, nil
+}
+
 func (ops *MySQLOps) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
@@ -350,6 +382,26 @@ func (ops *MySQLOps) GarbageCollectUserQueryHistory(userID int) (int64, error) {
 	return aff, nil
 }
 
+func (ops *MySQLOps) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	res, err := ops.db.ExecContext(
+		ops.ctx,
+		"DELETE FROM kontext_query_history "+
+			"WHERE created = ? AND userID = ? AND queryID = ? AND name IS NULL ",
+		created, userID, queryID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete query history item: %w", err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to delete query history item: %w", err)
+	}
+	if aff == 0 {
+		return fmt.Errorf("failed to delete query history item: no match within non-archived items")
+	}
+	return nil
+}
+
 func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
@@ -370,6 +422,32 @@ func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 	}
 	ans := make([]HistoryRecord, 0, num)
+	for rows.Next() {
+		var hRec HistoryRecord
+		var name sql.NullString
+		err := rows.Scan(&hRec.UserID, &hRec.QueryID, &hRec.Created, &name)
+		if err != nil {
+			return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
+		}
+		hRec.Name = name.String
+		ans = append(ans, hRec)
+	}
+	return ans, nil
+}
+
+func (ops *MySQLOps) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+	rows, err := tx.QueryContext(
+		ops.ctx,
+		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
+			"WHERE pending_deletion_from IS NOT NULL "+
+			"ORDER BY pending_deletion_from "+
+			"LIMIT ?",
+		maxItems,
+	)
+	if err != nil {
+		return []HistoryRecord{}, fmt.Errorf("failed to get pending deletion history: %w", err)
+	}
+	ans := make([]HistoryRecord, 0, maxItems)
 	for rows.Next() {
 		var hRec HistoryRecord
 		var name sql.NullString

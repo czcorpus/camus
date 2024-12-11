@@ -16,7 +16,10 @@
 
 package cncdb
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type SubcProps struct {
 	Name      string
@@ -27,6 +30,8 @@ type SubcProps struct {
 // database operations. We need it mainly to allow
 // injecting "dummy" database adapter for "dry-run" mode.
 type IMySQLOps interface {
+	NewTransaction() (*sql.Tx, error)
+
 	LoadRecentNRecords(num int) ([]ArchRecord, error)
 	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error)
 	ContainsRecord(concID string) (bool, error)
@@ -51,7 +56,13 @@ type IMySQLOps interface {
 	GetAllUsersWithQueryHistory() ([]int, error)
 
 	GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error)
+	MarkOldQueryHistory(numPreserve int) (int64, error)
 	GarbageCollectUserQueryHistory(userID int) (int64, error)
 	GetUserGarbageHistory(userID int) ([]HistoryRecord, error)
+	RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error
+
+	// GetPendingDeletionHistory should return records with oldest
+	// pending deletion time.
+	GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error)
 	LoadRecentNHistory(num int) ([]HistoryRecord, error)
 }

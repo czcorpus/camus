@@ -70,6 +70,21 @@ func (a *Actions) IndexLatestRecords(ctx *gin.Context) {
 	uniresp.WriteJSONResponse(ctx.Writer, resp)
 }
 
+func (a *Actions) IndexInfo(ctx *gin.Context) {
+	count, err := a.idxService.Indexer().Count()
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	// CurOnDiskBytes
+	resp := map[string]any{
+		"name":           a.idxService.indexer.bleveIdx.Name(),
+		"totalDocuments": count,
+		"stats":          a.idxService.indexer.bleveIdx.Stats(),
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, resp)
+}
+
 func (a *Actions) RecordToDoc(ctx *gin.Context) {
 	hRec := cncdb.HistoryRecord{
 		QueryID: ctx.Query("id"),

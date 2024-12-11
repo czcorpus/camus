@@ -17,6 +17,7 @@
 package cncdb
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -27,6 +28,10 @@ import (
 // just logs its information.
 type MySQLDryRun struct {
 	db *MySQLOps
+}
+
+func (db *MySQLDryRun) NewTransaction() (*sql.Tx, error) {
+	return db.db.NewTransaction()
 }
 
 func (db *MySQLDryRun) LoadRecentNRecords(num int) ([]ArchRecord, error) {
@@ -81,6 +86,11 @@ func (ops *MySQLDryRun) GetUserQueryHistory(userID int, numItems int) ([]History
 	return ops.db.GetUserQueryHistory(userID, numItems)
 }
 
+func (ops *MySQLDryRun) MarkOldQueryHistory(numPreserve int) (int64, error) {
+	log.Info().Msgf("DRY-RUN>>> MarkOldQueryHistory(%d)", numPreserve)
+	return 0, nil
+}
+
 func (db *MySQLDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return db.db.LoadRecentNHistory(num)
 }
@@ -92,6 +102,15 @@ func (db *MySQLDryRun) GarbageCollectUserQueryHistory(userID int) (int64, error)
 
 func (db *MySQLDryRun) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
 	return db.db.GetUserGarbageHistory(userID)
+}
+
+func (db *MySQLDryRun) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	log.Info().Msgf("DRY-RUN>>> RemoveQueryHistory(%d, %d, %s)", created, userID, queryID)
+	return nil
+}
+
+func (db *MySQLDryRun) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+	return db.db.GetPendingDeletionHistory(tx, maxItems)
 }
 
 func NewMySQLDryRun(ops *MySQLOps) *MySQLDryRun {

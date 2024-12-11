@@ -16,10 +16,17 @@
 
 package cncdb
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 // DummySQL is a testing implementation of IMySQLOps
 type DummySQL struct {
+}
+
+func (dsql *DummySQL) NewTransaction() (*sql.Tx, error) {
+	return nil, nil
 }
 
 func (dsql *DummySQL) LoadRecentNRecords(num int) ([]ArchRecord, error) {
@@ -70,6 +77,10 @@ func (dsql *DummySQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRe
 	return []HistoryRecord{}, nil
 }
 
+func (dsql *DummySQL) MarkOldQueryHistory(numPreserve int) (int64, error) {
+	return 0, nil
+}
+
 func (dsql *DummySQL) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
@@ -79,5 +90,12 @@ func (dsql *DummySQL) GarbageCollectUserQueryHistory(userID int) (int64, error) 
 }
 
 func (dsql *DummySQL) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+	return []HistoryRecord{}, nil
+}
+func (dsql *DummySQL) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	return nil
+}
+
+func (dsql *DummySQL) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }

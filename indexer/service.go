@@ -21,17 +21,13 @@ import (
 	"camus/archiver"
 	"camus/cncdb"
 	"context"
-	"encoding/json"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
 type Service struct {
-	indexer    *Indexer
-	redis      *archiver.RedisAdapter
-	rmChanName string
-	rmChan     <-chan *redis.Message
+	indexer *Indexer
+	redis   *archiver.RedisAdapter
 }
 
 func (service *Service) Indexer() *Indexer {
@@ -40,35 +36,12 @@ func (service *Service) Indexer() *Indexer {
 
 func (service *Service) Start(ctx context.Context) {
 	log.Info().
-		Str("rmChan", service.rmChanName).
 		Str("redisHost", service.redis.String()).
 		Msg("starting indexer.Service task")
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				log.Info().Msg("about to close fulltext Service")
-				return
-			case msg := <-service.rmChan:
-				var item cncdb.HistoryRecord
-				if err := json.Unmarshal([]byte(msg.Payload), &item); err != nil {
-					log.Error().
-						Err(err).
-						Str("origMessage", msg.Payload).
-						Msg("failed to unmarshal next fulltext remove item")
-					continue
-				}
-				log.Debug().
-					Str("id", item.CreateIndexID()).
-					Str("queryId", item.QueryID).
-					Msg("about to remove item from Bleve index")
-				if err := service.indexer.Delete(item.CreateIndexID()); err != nil {
-					log.Error().
-						Str("id", item.CreateIndexID()).
-						Str("queryId", item.QueryID).
-						Msg("failed to remove item from Bleve index")
-				}
-			}
+		for range ctx.Done() {
+			log.Info().Msg("about to close fulltext Service")
+			return
 		}
 	}()
 }
@@ -88,9 +61,7 @@ func NewService(
 	redis *archiver.RedisAdapter,
 ) *Service {
 	return &Service{
-		indexer:    indexer,
-		redis:      redis,
-		rmChan:     redis.ChannelSubscribe(conf.DocRemoveChannel),
-		rmChanName: conf.DocRemoveChannel,
+		indexer: indexer,
+		redis:   redis,
 	}
 }

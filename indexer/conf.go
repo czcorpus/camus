@@ -18,14 +18,35 @@ package indexer
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/czcorpus/cnc-gokit/datetime"
 	"github.com/czcorpus/cnc-gokit/fs"
 )
 
+// Conf contains indexer's configuration as obtained
+// from a JSON file (or chunk). Please note that the
+// instance should be treated as ready only after
+// ValidateAndDefaults is called. Otherwise, it may
+// provide incorrect or inconsistent data.
 type Conf struct {
-	IndexDirPath           string `json:"indexDirPath"`
-	DocRemoveChannel       string `json:"docRemoveChannel"`
-	KonTextHistoryNumItems int    `json:"konTextHistoryNumItems"`
+	IndexDirPath            string `json:"indexDirPath"`
+	QueryHistoryNumPreserve int    `json:"queryHistoryNumPreserve"`
+
+	// HistoryCleanupInterval is a string encoded (10s, 1m, 5m30s etc.)
+	// interval specifying how often will Camus look for outdated/excessing
+	// records for each user.
+	HistoryCleanupInterval string `json:"historyCleanupInterval"`
+}
+
+func (conf *Conf) HistoryCleanupIntervalDur() time.Duration {
+	dur, err := datetime.ParseDuration(conf.HistoryCleanupInterval)
+	if err != nil {
+		panic(err) // we expect users to call ValidateAndDefaults() which
+		// checks for this too in a more graceful way so we can afford
+		// to panic here
+	}
+	return dur
 }
 
 func (conf *Conf) ValidateAndDefaults() error {
@@ -40,6 +61,17 @@ func (conf *Conf) ValidateAndDefaults() error {
 		return err
 	} else if !isDir {
 		return fmt.Errorf("index dir does not exist (indexDirPath)")
+	}
+	if conf.QueryHistoryNumPreserve <= 0 {
+		return fmt.Errorf("queryHistoryNumPreserve not specified (recommended > 100)")
+	}
+	if dur, err := datetime.ParseDuration(conf.HistoryCleanupInterval); err != nil || dur == 0 {
+		if err != nil {
+			return fmt.Errorf("failed to validate historyCleanupInterval: %w", err)
+		}
+		if dur == 0 {
+			return fmt.Errorf("historyCleanupInterval must be > 0")
+		}
 	}
 	return nil
 }

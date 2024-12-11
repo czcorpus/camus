@@ -126,7 +126,7 @@ func (di *DataInitializer) Run(
 			finishedAllChunks = true
 			break
 		}
-		qIDs, err := di.db.GetUserQueryHistory(nextUserID, conf.Indexer.KonTextHistoryNumItems)
+		qIDs, err := di.db.GetUserQueryHistory(nextUserID, conf.Indexer.QueryHistoryNumPreserve)
 		log.Info().
 			Int("userId", nextUserID).
 			Err(err).
