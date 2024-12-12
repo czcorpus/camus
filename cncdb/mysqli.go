@@ -69,4 +69,5 @@ type IQHistArchOps interface {
 	// pending deletion time.
 	GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error)
 	LoadRecentNHistory(num int) ([]HistoryRecord, error)
+	TableSize() (int64, error)
 }

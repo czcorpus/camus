@@ -105,3 +105,7 @@ func (dsql *DummyQHistSQL) RemoveRecord(tx *sql.Tx, created int64, userID int, q
 func (dsql *DummyQHistSQL) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
+
+func (dsql *DummyQHistSQL) TableSize() (int64, error) {
+	return 0, nil
+}

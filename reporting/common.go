@@ -50,9 +50,10 @@ type CleanupStats struct {
 // ------------
 
 type QueryHistoryDelStats struct {
-	IndexSize  int64 `json:"indexSize"`
-	NumDeleted int   `json:"numDeleted"`
-	NumErrors  int   `json:"numErrors"`
+	IndexSize    int64 `json:"indexSize"`
+	SQLTableSize int64 `json:"sqlTableSize"`
+	NumDeleted   int   `json:"numDeleted"`
+	NumErrors    int   `json:"numErrors"`
 }
 
 // ------------

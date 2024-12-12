@@ -475,6 +475,17 @@ func (ops *MySQLQueryHist) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) (
 	return ans, nil
 }
 
+func (ops *MySQLQueryHist) TableSize() (int64, error) {
+	rows := ops.db.QueryRow("SELECT COUNT(*) FROM kontext_query_history")
+	var count int64
+	if err := rows.Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to get size of the kontext_query_history table: %w", err)
+	}
+	return count, nil
+}
+
+// --------------------------
+
 func NewMySQLOps(ctx context.Context, db *sql.DB, tz *time.Location) (*MySQLConcArch, *MySQLQueryHist) {
 	return &MySQLConcArch{
 			ctx: ctx,

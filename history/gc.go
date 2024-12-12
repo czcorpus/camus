@@ -61,16 +61,24 @@ func (gc *GarbageCollector) Start(ctx context.Context) {
 			case <-markerTimer.C:
 				gc.createPendingRecords()
 			case <-timer.C:
+				var numErr int
 				indexSize, err := gc.indexer.Count()
 				if err != nil {
+					numErr++
 					log.Error().Err(err).Msg("failed to obtain fulltext index size")
 				}
-				delStats := gc.processDeletionPendingRecords()
-				if err == nil {
-					delStats.IndexSize = int64(indexSize)
 
-				} else {
-					delStats.NumErrors++
+				tableSize, err := gc.db.TableSize()
+				if err != nil {
+					numErr++
+					log.Error().Err(err).Msg("failed to obtain table kontext_query_history size")
+				}
+
+				delStats := gc.processDeletionPendingRecords()
+				delStats.NumErrors += numErr
+				if delStats.NumErrors == 0 {
+					delStats.IndexSize = int64(indexSize)
+					delStats.SQLTableSize = tableSize
 				}
 				gc.statusWriter.WriteQueryHistoryDeletionStatus(delStats)
 
