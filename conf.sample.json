@@ -33,12 +33,16 @@
     "archiver": {
         "checkIntervalSecs": 15,
         "checkIntervalChunk": 2,
-        "ddStateFilePath": "./deduplicator.bin",
+        "preloadLastNItems": 10,
+        "ddStateFilePath": "/path/to/deduplication/status/storage/dir",
         "queueKey": "conc_archive_queue",
         "failedRecordsKey": "camus_failed_items"
     },
     "indexer": {
-        "docRemoveChannel": "query_history_fulltext_del_channel",
-        "indexDirPath": "/path/to/camus-fulltext"
+        "indexDirPath": "/path/to/fulltext/data/dir",
+        "queryHistoryNumPreserve": 10,
+        "queryHistoryCleanupInterval": "15s",
+        "queryHistoryMarkPendingInterval": "15m",
+        "queryHistoryMaxNumDeleteAtOnce": 1
     }
 }

@@ -70,13 +70,19 @@ func generateRows(sqlRows *sql.Rows, expectedSize int) ([]ArchRecord, error) {
 	return ans, nil
 }
 
-type MySQLOps struct {
+// -----------------------------------------
+
+type MySQLConcArch struct {
 	db  *sql.DB
 	tz  *time.Location
 	ctx context.Context
 }
 
-func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
+func (ops *MySQLConcArch) NewTransaction() (*sql.Tx, error) {
+	return ops.db.BeginTx(ops.ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+}
+
+func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
 	// able to determine it from `order by created DESC limit X` ?)
@@ -96,7 +102,7 @@ func (ops *MySQLOps) LoadRecentNRecords(num int) ([]ArchRecord, error) {
 	return generateRows(rows, num)
 }
 
-func (ops *MySQLOps) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+func (ops *MySQLConcArch) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT id, data, created, num_access, last_access, permanent "+
@@ -109,7 +115,7 @@ func (ops *MySQLOps) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]Ar
 	return generateRows(rows, maxItems)
 }
 
-func (ops *MySQLOps) ContainsRecord(concID string) (bool, error) {
+func (ops *MySQLConcArch) ContainsRecord(concID string) (bool, error) {
 	row := ops.db.QueryRowContext(
 		ops.ctx,
 		"SELECT COUNT(*) FROM kontext_conc_persistence "+
@@ -122,7 +128,7 @@ func (ops *MySQLOps) ContainsRecord(concID string) (bool, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+func (ops *MySQLConcArch) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT data, created, num_access, last_access, permanent "+
@@ -144,7 +150,7 @@ func (ops *MySQLOps) LoadRecordsByID(concID string) ([]ArchRecord, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) InsertRecord(rec ArchRecord) error {
+func (ops *MySQLConcArch) InsertRecord(rec ArchRecord) error {
 	_, err := ops.db.ExecContext(
 		ops.ctx,
 		"INSERT INTO kontext_conc_persistence (id, data, created, num_access, last_access, permanent) "+
@@ -157,7 +163,7 @@ func (ops *MySQLOps) InsertRecord(rec ArchRecord) error {
 	return nil
 }
 
-func (ops *MySQLOps) UpdateRecordStatus(id string, status int) error {
+func (ops *MySQLConcArch) UpdateRecordStatus(id string, status int) error {
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"UPDATE kontext_conc_persistence SET permanent = ? WHERE id = ?", status, id)
@@ -174,7 +180,7 @@ func (ops *MySQLOps) UpdateRecordStatus(id string, status int) error {
 	return nil
 }
 
-func (ops *MySQLOps) RemoveRecordsByID(concID string) error {
+func (ops *MySQLConcArch) RemoveRecordsByID(concID string) error {
 	_, err := ops.db.ExecContext(
 		ops.ctx,
 		"DELETE FROM kontext_conc_persistence WHERE id = ?", concID)
@@ -184,7 +190,7 @@ func (ops *MySQLOps) RemoveRecordsByID(concID string) error {
 	return nil
 }
 
-func (ops *MySQLOps) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+func (ops *MySQLConcArch) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
 	err := ops.RemoveRecordsByID(rec.ID)
 	if err != nil {
 		return ArchRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
@@ -202,7 +208,7 @@ func (ops *MySQLOps) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (Ar
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
+func (ops *MySQLConcArch) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	if !forceLoad && !TimeIsAtNight(time.Now().In(ops.tz)) {
 		return [][2]int{}, ErrTooDemandingQuery
 	}
@@ -225,7 +231,7 @@ func (ops *MySQLOps) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetSubcorpusProps(subcID string) (SubcProps, error) {
+func (ops *MySQLConcArch) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	if subcID == "" {
 		return SubcProps{}, nil
 	}
@@ -249,7 +255,19 @@ func (ops *MySQLOps) GetSubcorpusProps(subcID string) (SubcProps, error) {
 	return SubcProps{Name: name, TextTypes: tt}, nil
 }
 
-func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
+// --------------------------------------------------
+
+type MySQLQueryHist struct {
+	db  *sql.DB
+	tz  *time.Location
+	ctx context.Context
+}
+
+func (ops *MySQLQueryHist) NewTransaction() (*sql.Tx, error) {
+	return ops.db.BeginTx(ops.ctx, nil)
+}
+
+func (ops *MySQLQueryHist) GetAllUsersWithQueryHistory() ([]int, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT DISTINCT user_id FROM kontext_query_history ORDER BY user_id",
@@ -269,7 +287,35 @@ func (ops *MySQLOps) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) MarkOldQueryHistory(numPreserve int) (int64, error) {
+	res, err := ops.db.ExecContext(
+		ops.ctx,
+		"UPDATE kontext_query_history AS qh JOIN "+
+			"( "+
+			"SELECT user_id, created, query_id "+
+			"FROM ( "+
+			"  SELECT user_id, created, query_id, "+
+			"  ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created DESC) AS row_num "+
+			"  FROM kontext_query_history "+
+			"  WHERE name is NULL "+
+			") AS tmp "+
+			"WHERE row_num > ? "+
+			"ORDER BY created "+
+			") AS du "+
+			"ON qh.user_id = du.user_id AND qh.created = du.created AND qh.query_id = du.query_id "+
+			"SET qh.pending_deletion_from = NOW() ",
+	)
+	if err != nil {
+		return -1, fmt.Errorf("failed to mark old query history records: %w", err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return -1, fmt.Errorf("failed to mark old query history records: %w", err)
+	}
+	return aff, nil
+}
+
+func (ops *MySQLQueryHist) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT query_id, created, name FROM ( "+
@@ -297,7 +343,7 @@ func (ops *MySQLOps) GetUserQueryHistory(userID int, numItems int) ([]HistoryRec
 	return ans, nil
 }
 
-func (ops *MySQLOps) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
@@ -327,7 +373,7 @@ func (ops *MySQLOps) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) 
 	return ans, nil
 }
 
-func (ops *MySQLOps) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+func (ops *MySQLQueryHist) GarbageCollectUserQueryHistory(userID int) (int64, error) {
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"DELETE FROM kontext_query_history "+
@@ -350,7 +396,27 @@ func (ops *MySQLOps) GarbageCollectUserQueryHistory(userID int) (int64, error) {
 	return aff, nil
 }
 
-func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+	res, err := ops.db.ExecContext(
+		ops.ctx,
+		"DELETE FROM kontext_query_history "+
+			"WHERE created = ? AND user_id = ? AND query_id = ? AND name IS NULL ",
+		created, userID, queryID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete query history item: %w", err)
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to delete query history item: %w", err)
+	}
+	if aff == 0 {
+		return fmt.Errorf("failed to delete query history item: no match within non-archived items")
+	}
+	return nil
+}
+
+func (ops *MySQLQueryHist) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
 	// able to determine it from `order by created DESC limit X` ?)
@@ -383,10 +449,40 @@ func (ops *MySQLOps) LoadRecentNHistory(num int) ([]HistoryRecord, error) {
 	return ans, nil
 }
 
-func NewMySQLOps(ctx context.Context, db *sql.DB, tz *time.Location) *MySQLOps {
-	return &MySQLOps{
-		ctx: ctx,
-		db:  db,
-		tz:  tz,
+func (ops *MySQLQueryHist) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+	rows, err := tx.QueryContext(
+		ops.ctx,
+		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
+			"WHERE pending_deletion_from IS NOT NULL "+
+			"ORDER BY pending_deletion_from "+
+			"LIMIT ?",
+		maxItems,
+	)
+	if err != nil {
+		return []HistoryRecord{}, fmt.Errorf("failed to get pending deletion history: %w", err)
 	}
+	ans := make([]HistoryRecord, 0, maxItems)
+	for rows.Next() {
+		var hRec HistoryRecord
+		var name sql.NullString
+		err := rows.Scan(&hRec.UserID, &hRec.QueryID, &hRec.Created, &name)
+		if err != nil {
+			return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
+		}
+		hRec.Name = name.String
+		ans = append(ans, hRec)
+	}
+	return ans, nil
+}
+
+func NewMySQLOps(ctx context.Context, db *sql.DB, tz *time.Location) (*MySQLConcArch, *MySQLQueryHist) {
+	return &MySQLConcArch{
+			ctx: ctx,
+			db:  db,
+			tz:  tz,
+		}, &MySQLQueryHist{
+			ctx: ctx,
+			db:  db,
+			tz:  tz,
+		}
 }

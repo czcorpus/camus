@@ -36,7 +36,7 @@ const (
 type Deduplicator struct {
 	knownIDs      *bloom.BloomFilter
 	knownIDsMutex *sync.RWMutex
-	concDB        cncdb.IMySQLOps
+	concDB        cncdb.IConcArchOps
 	tz            *time.Location
 	conf          *Conf
 }
@@ -168,7 +168,7 @@ func (dd *Deduplicator) TestAndSolve(newRec cncdb.ArchRecord) (bool, error) {
 }
 
 func NewDeduplicator(
-	concDB cncdb.IMySQLOps, conf *Conf, loc *time.Location) (*Deduplicator, error) {
+	concDB cncdb.IConcArchOps, conf *Conf, loc *time.Location) (*Deduplicator, error) {
 	filter := bloom.NewWithEstimates(bloomFilterNumBits, bloomFilterProbCollision)
 	d := &Deduplicator{
 		tz:            loc,

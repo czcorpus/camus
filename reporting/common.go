@@ -49,9 +49,18 @@ type CleanupStats struct {
 
 // ------------
 
+type QueryHistoryDelStats struct {
+	IndexSize  int64 `json:"indexSize"`
+	NumDeleted int   `json:"numDeleted"`
+	NumErrors  int   `json:"numErrors"`
+}
+
+// ------------
+
 type IReporting interface {
 	Start(ctx context.Context)
 	Stop(ctx context.Context) error
 	WriteOperationsStatus(item OpStats)
 	WriteCleanupStatus(item CleanupStats)
+	WriteQueryHistoryDeletionStatus(item QueryHistoryDelStats)
 }

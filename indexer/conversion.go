@@ -60,7 +60,7 @@ func importConc(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
 	hRec *cncdb.HistoryRecord,
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 ) (IndexableMidDoc, error) {
 
 	var form cncdb.ConcFormRecord
@@ -138,7 +138,7 @@ func importWlist(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
 	hRec *cncdb.HistoryRecord,
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 ) (IndexableMidDoc, error) {
 	var form cncdb.WlistFormRecord
 	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
@@ -169,7 +169,7 @@ func importKwords(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
 	hRec *cncdb.HistoryRecord,
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 ) (IndexableMidDoc, error) {
 	var form cncdb.KwordsFormRecord
 	if err := json.Unmarshal([]byte(hRec.Rec.Data), &form); err != nil {
@@ -211,7 +211,7 @@ func importPquery(
 	rec *cncdb.UntypedQueryRecord,
 	stype cncdb.QuerySupertype,
 	hRec *cncdb.HistoryRecord,
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 	cdb concDB,
 ) (IndexableMidDoc, error) {
 	var form cncdb.PQueryFormRecord

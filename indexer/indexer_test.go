@@ -33,11 +33,10 @@ func prepareIndexer() *Indexer {
 		panic(err)
 	}
 	conf := Conf{
-		IndexDirPath:           tempDir,
-		DocRemoveChannel:       "",
-		KonTextHistoryNumItems: 100,
+		IndexDirPath:            tempDir,
+		QueryHistoryNumPreserve: 100,
 	}
-	idxer, err := NewIndexer(&conf, &cncdb.DummySQL{}, nil, nil)
+	idxer, err := NewIndexer(&conf, &cncdb.DummyConcArchSQL{}, &cncdb.MySQLQueryHistDryRun{}, nil, nil)
 	if err != nil {
 		panic(err)
 	}

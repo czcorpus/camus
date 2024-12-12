@@ -57,7 +57,7 @@ type service interface {
 }
 
 func createArchiver(
-	db cncdb.IMySQLOps,
+	db cncdb.IConcArchOps,
 	rdb *archiver.RedisAdapter,
 	recsToIndex chan<- cncdb.HistoryRecord,
 	reporting reporting.IReporting,
@@ -196,36 +196,49 @@ func main() {
 			reportingService = &reporting.DummyWriter{}
 		}
 
-		var dbOps cncdb.IMySQLOps
-		dbOpsRaw := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
+		// ---------- prepare db operations providers for services  ---------------------------
+
+		var dbArchOps cncdb.IConcArchOps
+		var dbQHistOps cncdb.IQHistArchOps
+
+		dbArchOpsRaw, dbQHistOpsRaw := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
 		if *dryRun {
-			dbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
+			dbArchOps, dbQHistOps = cncdb.NewMySQLDryRun(dbArchOpsRaw, dbQHistOpsRaw)
 
 		} else {
-			dbOps = dbOpsRaw
+			dbArchOps = dbArchOpsRaw
+			dbQHistOps = dbQHistOpsRaw
 		}
 
-		var cleanerDbOps cncdb.IMySQLOps
+		// archive cleaner service:
+
+		var archCleanerDbOps cncdb.IConcArchOps
 		if *dryRunCleaner {
-			cleanerDbOps = cncdb.NewMySQLDryRun(dbOpsRaw)
+			archCleanerDbOps, _ = cncdb.NewMySQLDryRun(dbArchOpsRaw, dbQHistOpsRaw)
 
 		} else {
-			cleanerDbOps = dbOps
+			archCleanerDbOps = dbArchOpsRaw
 		}
+
+		// -------
 
 		recsToIndex := make(chan cncdb.HistoryRecord)
 
-		ftIndexer, err := indexer.NewIndexer(conf.Indexer, dbOps, rdb, recsToIndex)
+		// conc. archiver service:
+
+		arch := createArchiver(dbArchOps, rdb, recsToIndex, reportingService, conf)
+
+		cln := cleaner.NewService(
+			archCleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
+
+		// query history fulltext service:
+
+		ftIndexer, err := indexer.NewIndexer(conf.Indexer, archCleanerDbOps, dbQHistOps, rdb, recsToIndex)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to initialize index")
 			os.Exit(1)
 			return
 		}
-
-		arch := createArchiver(dbOps, rdb, recsToIndex, reportingService, conf)
-
-		cln := cleaner.NewService(
-			cleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
 
 		fulltext := indexer.NewService(conf.Indexer, ftIndexer, rdb)
 
@@ -236,7 +249,19 @@ func main() {
 			rdb:             rdb,
 		}
 
-		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService}
+		// query history garbage collector service
+
+		qHistGC := history.NewGarbageCollector(
+			dbQHistOps,
+			rdb,
+			ftIndexer,
+			reportingService,
+			conf.Indexer,
+		)
+
+		// -------
+
+		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService, qHistGC}
 		for _, m := range services {
 			m.Start(ctx)
 		}
@@ -274,13 +299,15 @@ func main() {
 		defer stop()
 		db, err := cncdb.DBOpen(conf.MySQL)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to open SQL database")
+			log.Error().Err(err).Msg("Failed to open SQL databaNewGarbageCollectorse")
 			os.Exit(1)
 			return
 		}
 		log.Info().Msgf("using database %s@%s", conf.MySQL.Name, conf.MySQL.Host)
+		dbConcArchOps, dbQHistOps := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
 		exec := history.NewDataInitializer(
-			cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
+			dbConcArchOps,
+			dbQHistOps,
 			archiver.NewRedisAdapter(ctx, conf.Redis),
 		)
 		exec.Run(ctx, conf, *initChunkSize)
@@ -294,11 +321,27 @@ func main() {
 			return
 		}
 		log.Info().Msgf("using database %s@%s", conf.MySQL.Name, conf.MySQL.Host)
+
+		rdb := archiver.NewRedisAdapter(ctx, conf.Redis)
+		dbConcArchOps, dbQHistOps := cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation())
+
+		recsToIndex := make(chan cncdb.HistoryRecord)
+		ftIndexer, err := indexer.NewIndexer(conf.Indexer, dbConcArchOps, dbQHistOps, rdb, recsToIndex)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to initialize index")
+			os.Exit(1)
+			return
+		}
+
 		exec := history.NewGarbageCollector(
-			cncdb.NewMySQLOps(ctx, db, conf.TimezoneLocation()),
-			archiver.NewRedisAdapter(ctx, conf.Redis),
+			dbQHistOps,
+			rdb,
+			ftIndexer,
+			&reporting.DummyWriter{},
+			conf.Indexer,
 		)
-		exec.Run(ctx, conf, *initChunkSize2)
+		exec.RunAdHoc(ctx, dbConcArchOps, conf, *initChunkSize2)
+		close(recsToIndex)
 
 	default:
 		log.Fatal().Msgf("Unknown action %s", action)

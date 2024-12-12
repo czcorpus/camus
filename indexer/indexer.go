@@ -46,7 +46,8 @@ type searchedTerm struct {
 
 type Indexer struct {
 	conf        *Conf
-	db          cncdb.IMySQLOps
+	concArchDb  cncdb.IConcArchOps
+	queryHistDb cncdb.IQHistArchOps
 	rdb         *archiver.RedisAdapter
 	bleveIdx    bleve.Index
 	dataPath    string
@@ -68,7 +69,7 @@ func (idx *Indexer) DataPath() string {
 // - non error thing - e.g. sample, shuffle, filter,...),
 // such records are ignored.
 func (idx *Indexer) IndexRecentRecords(numLatest int) (int, error) {
-	history, err := idx.db.LoadRecentNHistory(numLatest)
+	history, err := idx.queryHistDb.LoadRecentNHistory(numLatest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to index records: %w", err)
 	}
@@ -112,13 +113,13 @@ func (idx *Indexer) RecToDoc(hRec *cncdb.HistoryRecord) (IndexableMidDoc, error)
 	var ans IndexableMidDoc
 	switch qstype {
 	case cncdb.QuerySupertypeConc:
-		ans, err = importConc(&rec, qstype, hRec, idx.db)
+		ans, err = importConc(&rec, qstype, hRec, idx.concArchDb)
 	case cncdb.QuerySupertypeWlist:
-		ans, err = importWlist(&rec, qstype, hRec, idx.db)
+		ans, err = importWlist(&rec, qstype, hRec, idx.concArchDb)
 	case cncdb.QuerySupertypeKwords:
-		ans, err = importKwords(&rec, qstype, hRec, idx.db)
+		ans, err = importKwords(&rec, qstype, hRec, idx.concArchDb)
 	case cncdb.QuerySupertypePquery:
-		ans, err = importPquery(&rec, qstype, hRec, idx.db, idx.rdb)
+		ans, err = importPquery(&rec, qstype, hRec, idx.concArchDb, idx.rdb)
 	default:
 		err = ErrRecordNotIndexable
 	}
@@ -242,7 +243,7 @@ func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.ArchRecord, error) {
 	rec, err := idx.rdb.GetConcRecord(queryID)
 	if err == cncdb.ErrRecordNotFound {
 		log.Info().Str("queryId", queryID).Msg("record not found in Redis, trying MySQL")
-		recs, err := idx.db.LoadRecordsByID(queryID)
+		recs, err := idx.concArchDb.LoadRecordsByID(queryID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load query %s from MySQL: %w", queryID, err)
 		}
@@ -282,7 +283,8 @@ func (idx *Indexer) Stop(ctx context.Context) error {
 
 func NewIndexer(
 	conf *Conf,
-	db cncdb.IMySQLOps,
+	concArchDb cncdb.IConcArchOps,
+	queryHistDb cncdb.IQHistArchOps,
 	rdb *archiver.RedisAdapter,
 	recsToIndex <-chan cncdb.HistoryRecord,
 ) (*Indexer, error) {
@@ -302,7 +304,8 @@ func NewIndexer(
 	}
 	return &Indexer{
 		conf:        conf,
-		db:          db,
+		concArchDb:  concArchDb,
+		queryHistDb: queryHistDb,
 		rdb:         rdb,
 		bleveIdx:    bleveIdx,
 		recsToIndex: recsToIndex,
@@ -317,13 +320,14 @@ type asyncIndexerRes struct {
 
 func NewIndexerOrDie(
 	conf *Conf,
-	db cncdb.IMySQLOps,
+	concArchDb cncdb.IConcArchOps,
+	queryHistDb cncdb.IQHistArchOps,
 	rdb *archiver.RedisAdapter,
 	recsToIndex <-chan cncdb.HistoryRecord,
 ) (*Indexer, error) {
 	resultChan := make(chan asyncIndexerRes, 1)
 	go func() {
-		res, err := NewIndexer(conf, db, rdb, recsToIndex)
+		res, err := NewIndexer(conf, concArchDb, queryHistDb, rdb, recsToIndex)
 		resultChan <- asyncIndexerRes{res, err}
 	}()
 
