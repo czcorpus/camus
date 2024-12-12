@@ -75,15 +75,15 @@ func (dsql *DummyConcArchSQL) GetSubcorpusProps(subcID string) (SubcProps, error
 type DummyQHistSQL struct {
 }
 
-func (dsql *DummyQHistSQL) GetAllUsersWithQueryHistory() ([]int, error) {
+func (dsql *DummyQHistSQL) GetAllUsersWithSomeRecords() ([]int, error) {
 	return []int{}, nil
 }
 
-func (dsql *DummyQHistSQL) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+func (dsql *DummyQHistSQL) GetUserRecords(userID int, numItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
 
-func (dsql *DummyQHistSQL) MarkOldQueryHistory(numPreserve int) (int64, error) {
+func (dsql *DummyQHistSQL) MarkOldRecords(numPreserve int) (int64, error) {
 	return 0, nil
 }
 
@@ -91,17 +91,17 @@ func (dsql *DummyQHistSQL) LoadRecentNHistory(num int) ([]HistoryRecord, error) 
 	return []HistoryRecord{}, nil
 }
 
-func (dsql *DummyQHistSQL) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+func (dsql *DummyQHistSQL) GarbageCollectRecords(userID int) (int64, error) {
 	return 0, nil
 }
 
-func (dsql *DummyQHistSQL) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+func (dsql *DummyQHistSQL) GetUserGarbageRecords(userID int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }
-func (dsql *DummyQHistSQL) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+func (dsql *DummyQHistSQL) RemoveRecord(tx *sql.Tx, created int64, userID int, queryID string) error {
 	return nil
 }
 
-func (dsql *DummyQHistSQL) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+func (dsql *DummyQHistSQL) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
 	return []HistoryRecord{}, nil
 }

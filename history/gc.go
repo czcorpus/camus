@@ -94,7 +94,7 @@ func (gc *GarbageCollector) Start(ctx context.Context) {
 }
 
 func (gc *GarbageCollector) createPendingRecords() {
-	numRm, err := gc.db.MarkOldQueryHistory(gc.numPreserve)
+	numRm, err := gc.db.MarkOldRecords(gc.numPreserve)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -116,7 +116,7 @@ func (gc *GarbageCollector) processDeletionPendingRecords() reporting.QueryHisto
 		log.Error().Err(err).Msg("failed to retrieve next query history data with pending deletion")
 		return reporting.QueryHistoryDelStats{NumErrors: 1}
 	}
-	recs, err := gc.db.GetPendingDeletionHistory(tx, gc.maxNumDelete)
+	recs, err := gc.db.GetPendingDeletionRecords(tx, gc.maxNumDelete)
 	log.Debug().
 		Int("maxLimit", gc.maxNumDelete).
 		Int("numRecords", len(recs)).
@@ -129,7 +129,7 @@ func (gc *GarbageCollector) processDeletionPendingRecords() reporting.QueryHisto
 		return reporting.QueryHistoryDelStats{NumErrors: 1}
 	}
 	for _, rec := range recs {
-		if err := gc.db.RemoveQueryHistory(tx, rec.Created, rec.UserID, rec.QueryID); err != nil {
+		if err := gc.db.RemoveRecord(tx, rec.Created, rec.UserID, rec.QueryID); err != nil {
 			log.Error().
 				Int64("created", rec.Created).
 				Int("userId", rec.UserID).
@@ -183,7 +183,7 @@ func (gc *GarbageCollector) RunAdHoc(
 	}
 	if !cacheExists {
 		log.Info().Msg("processed user IDs not found - will create a new set")
-		users, err := gc.db.GetAllUsersWithQueryHistory()
+		users, err := gc.db.GetAllUsersWithSomeRecords()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to garbage collect query history")
 			os.Exit(2)
@@ -216,7 +216,7 @@ func (gc *GarbageCollector) RunAdHoc(
 			break
 		}
 
-		rmFromIndex, err := gc.db.GetUserGarbageHistory(nextUserID)
+		rmFromIndex, err := gc.db.GetUserGarbageRecords(nextUserID)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -235,7 +235,7 @@ func (gc *GarbageCollector) RunAdHoc(
 			}
 		}
 
-		numRemoved, err := gc.db.GarbageCollectUserQueryHistory(nextUserID)
+		numRemoved, err := gc.db.GarbageCollectRecords(nextUserID)
 		if err != nil {
 			log.Error().
 				Err(err).

@@ -95,7 +95,7 @@ func (di *DataInitializer) Run(
 	}
 	if !cacheExists {
 		log.Info().Msg("processed user IDs not found - will create a new set")
-		users, err := di.queryHistDb.GetAllUsersWithQueryHistory()
+		users, err := di.queryHistDb.GetAllUsersWithSomeRecords()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to init query history")
 			os.Exit(2)
@@ -127,7 +127,7 @@ func (di *DataInitializer) Run(
 			finishedAllChunks = true
 			break
 		}
-		qIDs, err := di.queryHistDb.GetUserQueryHistory(nextUserID, conf.Indexer.QueryHistoryNumPreserve)
+		qIDs, err := di.queryHistDb.GetUserRecords(nextUserID, conf.Indexer.QueryHistoryNumPreserve)
 		log.Info().
 			Int("userId", nextUserID).
 			Err(err).

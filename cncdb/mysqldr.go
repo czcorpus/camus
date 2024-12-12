@@ -91,16 +91,16 @@ func (ops *MySQLQueryHistDryRun) NewTransaction() (*sql.Tx, error) {
 	return ops.db.NewTransaction()
 }
 
-func (ops *MySQLQueryHistDryRun) GetAllUsersWithQueryHistory() ([]int, error) {
-	return ops.db.GetAllUsersWithQueryHistory()
+func (ops *MySQLQueryHistDryRun) GetAllUsersWithSomeRecords() ([]int, error) {
+	return ops.db.GetAllUsersWithSomeRecords()
 }
 
-func (ops *MySQLQueryHistDryRun) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
-	return ops.db.GetUserQueryHistory(userID, numItems)
+func (ops *MySQLQueryHistDryRun) GetUserRecords(userID int, numItems int) ([]HistoryRecord, error) {
+	return ops.db.GetUserRecords(userID, numItems)
 }
 
-func (ops *MySQLQueryHistDryRun) MarkOldQueryHistory(numPreserve int) (int64, error) {
-	log.Info().Msgf("DRY-RUN>>> MarkOldQueryHistory(%d)", numPreserve)
+func (ops *MySQLQueryHistDryRun) MarkOldRecords(numPreserve int) (int64, error) {
+	log.Info().Msgf("DRY-RUN>>> MarkOldRecords(%d)", numPreserve)
 	return 0, nil
 }
 
@@ -108,22 +108,22 @@ func (db *MySQLQueryHistDryRun) LoadRecentNHistory(num int) ([]HistoryRecord, er
 	return db.db.LoadRecentNHistory(num)
 }
 
-func (db *MySQLQueryHistDryRun) GarbageCollectUserQueryHistory(userID int) (int64, error) {
-	log.Info().Msgf("DRY-RUN>>> GarbageCollectUserQueryHistory(%d)", userID)
+func (db *MySQLQueryHistDryRun) GarbageCollectRecords(userID int) (int64, error) {
+	log.Info().Msgf("DRY-RUN>>> GarbageCollectRecords(%d)", userID)
 	return 0, nil
 }
 
-func (db *MySQLQueryHistDryRun) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
-	return db.db.GetUserGarbageHistory(userID)
+func (db *MySQLQueryHistDryRun) GetUserGarbageRecords(userID int) ([]HistoryRecord, error) {
+	return db.db.GetUserGarbageRecords(userID)
 }
 
-func (db *MySQLQueryHistDryRun) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
-	log.Info().Msgf("DRY-RUN>>> RemoveQueryHistory(%d, %d, %s)", created, userID, queryID)
+func (db *MySQLQueryHistDryRun) RemoveRecord(tx *sql.Tx, created int64, userID int, queryID string) error {
+	log.Info().Msgf("DRY-RUN>>> RemoveRecord(%d, %d, %s)", created, userID, queryID)
 	return nil
 }
 
-func (db *MySQLQueryHistDryRun) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
-	return db.db.GetPendingDeletionHistory(tx, maxItems)
+func (db *MySQLQueryHistDryRun) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+	return db.db.GetPendingDeletionRecords(tx, maxItems)
 }
 
 func NewMySQLDryRun(opsArch *MySQLConcArch, opsHist *MySQLQueryHist) (*MySQLConcArchDryRun, *MySQLQueryHistDryRun) {

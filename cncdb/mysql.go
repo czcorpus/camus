@@ -267,7 +267,7 @@ func (ops *MySQLQueryHist) NewTransaction() (*sql.Tx, error) {
 	return ops.db.BeginTx(ops.ctx, nil)
 }
 
-func (ops *MySQLQueryHist) GetAllUsersWithQueryHistory() ([]int, error) {
+func (ops *MySQLQueryHist) GetAllUsersWithSomeRecords() ([]int, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT DISTINCT user_id FROM kontext_query_history ORDER BY user_id",
@@ -287,7 +287,7 @@ func (ops *MySQLQueryHist) GetAllUsersWithQueryHistory() ([]int, error) {
 	return ans, nil
 }
 
-func (ops *MySQLQueryHist) MarkOldQueryHistory(numPreserve int) (int64, error) {
+func (ops *MySQLQueryHist) MarkOldRecords(numPreserve int) (int64, error) {
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"UPDATE kontext_query_history AS qh JOIN "+
@@ -315,7 +315,7 @@ func (ops *MySQLQueryHist) MarkOldQueryHistory(numPreserve int) (int64, error) {
 	return aff, nil
 }
 
-func (ops *MySQLQueryHist) GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) GetUserRecords(userID int, numItems int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT query_id, created, name FROM ( "+
@@ -343,7 +343,7 @@ func (ops *MySQLQueryHist) GetUserQueryHistory(userID int, numItems int) ([]Hist
 	return ans, nil
 }
 
-func (ops *MySQLQueryHist) GetUserGarbageHistory(userID int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) GetUserGarbageRecords(userID int) ([]HistoryRecord, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
@@ -373,7 +373,7 @@ func (ops *MySQLQueryHist) GetUserGarbageHistory(userID int) ([]HistoryRecord, e
 	return ans, nil
 }
 
-func (ops *MySQLQueryHist) GarbageCollectUserQueryHistory(userID int) (int64, error) {
+func (ops *MySQLQueryHist) GarbageCollectRecords(userID int) (int64, error) {
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"DELETE FROM kontext_query_history "+
@@ -396,7 +396,7 @@ func (ops *MySQLQueryHist) GarbageCollectUserQueryHistory(userID int) (int64, er
 	return aff, nil
 }
 
-func (ops *MySQLQueryHist) RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error {
+func (ops *MySQLQueryHist) RemoveRecord(tx *sql.Tx, created int64, userID int, queryID string) error {
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"DELETE FROM kontext_query_history "+
@@ -449,7 +449,7 @@ func (ops *MySQLQueryHist) LoadRecentNHistory(num int) ([]HistoryRecord, error) 
 	return ans, nil
 }
 
-func (ops *MySQLQueryHist) GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
+func (ops *MySQLQueryHist) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error) {
 	rows, err := tx.QueryContext(
 		ops.ctx,
 		"SELECT user_id, query_id, created, name FROM kontext_query_history "+
