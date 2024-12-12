@@ -126,6 +126,10 @@ func (db *MySQLQueryHistDryRun) GetPendingDeletionRecords(tx *sql.Tx, maxItems i
 	return db.db.GetPendingDeletionRecords(tx, maxItems)
 }
 
+func (db *MySQLQueryHistDryRun) TableSize() (int64, error) {
+	return db.db.TableSize()
+}
+
 func NewMySQLDryRun(opsArch *MySQLConcArch, opsHist *MySQLQueryHist) (*MySQLConcArchDryRun, *MySQLQueryHistDryRun) {
 	return &MySQLConcArchDryRun{db: opsArch}, &MySQLQueryHistDryRun{db: opsHist}
 }

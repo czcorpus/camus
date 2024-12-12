@@ -116,6 +116,7 @@ func (ds *StatusWriter) WriteQueryHistoryDeletionStatus(item QueryHistoryDelStat
 	if ds.tableWriterQHDelStats != nil {
 		ds.indexInfoDataCh <- *ds.tableWriterCleanup.NewEntry(time.Now().In(ds.location)).
 			Int("index_size", int(item.IndexSize)).
+			Int("sql_table_size", int(item.SQLTableSize)).
 			Int("num_deleted", item.NumDeleted).
 			Int("num_errors", item.NumErrors)
 	}
