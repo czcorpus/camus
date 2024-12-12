@@ -52,18 +52,21 @@ type IConcArchOps interface {
 	GetSubcorpusProps(subcID string) (SubcProps, error)
 }
 
+// IQHistArchOps is an abstract interface for high level
+// database operations for query history (which itself is kind
+// of a "tag" to the concordance archive table)
 type IQHistArchOps interface {
 	NewTransaction() (*sql.Tx, error)
-	GetAllUsersWithQueryHistory() ([]int, error)
+	GetAllUsersWithSomeRecords() ([]int, error)
 
-	GetUserQueryHistory(userID int, numItems int) ([]HistoryRecord, error)
-	MarkOldQueryHistory(numPreserve int) (int64, error)
-	GarbageCollectUserQueryHistory(userID int) (int64, error)
-	GetUserGarbageHistory(userID int) ([]HistoryRecord, error)
-	RemoveQueryHistory(tx *sql.Tx, created int64, userID int, queryID string) error
+	GetUserRecords(userID int, numItems int) ([]HistoryRecord, error)
+	MarkOldRecords(numPreserve int) (int64, error)
+	GarbageCollectRecords(userID int) (int64, error)
+	GetUserGarbageRecords(userID int) ([]HistoryRecord, error)
+	RemoveRecord(tx *sql.Tx, created int64, userID int, queryID string) error
 
-	// GetPendingDeletionHistory should return records with oldest
+	// GetPendingDeletionRecords should return records with oldest
 	// pending deletion time.
-	GetPendingDeletionHistory(tx *sql.Tx, maxItems int) ([]HistoryRecord, error)
+	GetPendingDeletionRecords(tx *sql.Tx, maxItems int) ([]HistoryRecord, error)
 	LoadRecentNHistory(num int) ([]HistoryRecord, error)
 }
