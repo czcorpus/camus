@@ -292,5 +292,6 @@ func NewGarbageCollector(
 		checkInterval: conf.QueryHistoryCleanupIntervalDur(),
 		markInterval:  conf.QueryHistoryMarkPendingIntervalDur(),
 		maxNumDelete:  conf.QueryHistoryMaxNumDeleteAtOnce,
+		numPreserve:   conf.QueryHistoryNumPreserve,
 	}
 }
