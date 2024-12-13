@@ -287,7 +287,13 @@ func (ops *MySQLQueryHist) GetAllUsersWithSomeRecords() ([]int, error) {
 	return ans, nil
 }
 
+// MarkOldRecords takes ordered records for each user and enything above numPreserve
+// is marked for deletion (column `pending_deletion_from`).
+// The method panics in case numPreserve <= 0 (i.e. even zero is forbidden)
 func (ops *MySQLQueryHist) MarkOldRecords(numPreserve int) (int64, error) {
+	if numPreserve <= 0 {
+		panic("cannot MarkOldRecords - numPreserve must be > 0")
+	}
 	res, err := ops.db.ExecContext(
 		ops.ctx,
 		"UPDATE kontext_query_history AS qh JOIN "+
