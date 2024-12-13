@@ -304,6 +304,7 @@ func (ops *MySQLQueryHist) MarkOldRecords(numPreserve int) (int64, error) {
 			") AS du "+
 			"ON qh.user_id = du.user_id AND qh.created = du.created AND qh.query_id = du.query_id "+
 			"SET qh.pending_deletion_from = NOW() ",
+		numPreserve,
 	)
 	if err != nil {
 		return -1, fmt.Errorf("failed to mark old query history records: %w", err)
