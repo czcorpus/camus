@@ -98,3 +98,11 @@ type HistoryRecord struct {
 func (qh *HistoryRecord) CreateIndexID() string {
 	return fmt.Sprintf("%d/%d/%s", qh.UserID, qh.Created, qh.QueryID)
 }
+
+// ----------------------------------
+
+type ConcCacheRecord struct {
+	ID    string
+	Key   string
+	Value string
+}

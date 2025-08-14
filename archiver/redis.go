@@ -19,6 +19,7 @@ package archiver
 import (
 	"camus/cncdb"
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -242,6 +243,39 @@ func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
 	}
 	return cncdb.ArchRecord{
 		ID:   id,
+		Data: ans.Val(),
+	}, nil
+}
+
+func (rd *RedisAdapter) mkConcCacheKey(corpusId string) string {
+	return fmt.Sprintf("conc_cache:%s", strings.ToLower(corpusId))
+}
+
+func (rd *RedisAdapter) mkConcCacheField(corpusId string, q []string, cutoff int) string {
+	rawField := strings.Join([]string{corpusId, strings.Join(q, "#"), strconv.Itoa(cutoff)}, "")
+	return fmt.Sprintf("%x", sha1.Sum([]byte(rawField)))
+}
+
+func (rd *RedisAdapter) GetConcCacheRecord(id string) (cncdb.ArchRecord, error) {
+	concRecord, err := rd.GetConcRecord(id)
+	if err != nil {
+		return cncdb.ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", err)
+	}
+	data, err := concRecord.FetchData()
+	if err != nil {
+		return cncdb.ArchRecord{}, fmt.Errorf("failed to fetch concordance record data: %w", err)
+	}
+	corpusId := data.GetCorpora()[0]
+	field := rd.mkConcCacheField(corpusId, data.GetQuery(), 0)
+	ans := rd.redis.HGet(rd.ctx, rd.mkConcCacheKey(corpusId), field)
+	if ans.Err() == redis.Nil {
+		return cncdb.ArchRecord{}, cncdb.ErrRecordNotFound
+	}
+	if ans.Err() != nil {
+		return cncdb.ArchRecord{}, fmt.Errorf("failed to get conc_cache record: %w", ans.Err())
+	}
+	return cncdb.ArchRecord{
+		ID:   field,
 		Data: ans.Val(),
 	}, nil
 }

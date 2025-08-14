@@ -157,3 +157,12 @@ func (a *Actions) DedupReset(ctx *gin.Context) {
 	}
 	uniresp.WriteJSONResponse(ctx.Writer, map[string]any{"ok": true})
 }
+
+func (a *Actions) GetConcCacheRecord(ctx *gin.Context) {
+	rec, err := a.ArchKeeper.LoadConcCacheRecordByID(ctx.Param("id"))
+	if err != nil {
+		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
+		return
+	}
+	uniresp.WriteJSONResponse(ctx.Writer, rec)
+}

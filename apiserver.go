@@ -58,6 +58,7 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.GET("/validate/:id", archHandler.Validate)
 	engine.POST("/fix/:id", archHandler.Fix)
 	engine.POST("/dedup-reset", archHandler.DedupReset)
+	engine.GET("/conc-cache/:id", archHandler.GetRecord)
 
 	indexerHandler := indexer.NewActions(api.fulltextService)
 	engine.GET("/query-history/build", indexerHandler.IndexLatestRecords)
