@@ -252,8 +252,9 @@ func (rd *RedisAdapter) mkConcCacheKey(corpusId string) string {
 }
 
 func (rd *RedisAdapter) mkConcCacheField(corpusId string, q []string, cutoff int) string {
-	rawField := strings.Join([]string{corpusId, strings.Join(q, "#"), strconv.Itoa(cutoff)}, "")
-	return fmt.Sprintf("%x", sha1.Sum([]byte(rawField)))
+	hashInput := strings.Join(q, "#") + corpusId + strconv.Itoa(cutoff)
+	hash := sha1.Sum([]byte(hashInput))
+	return fmt.Sprintf("%x", hash)
 }
 
 func (rd *RedisAdapter) GetConcCacheRecord(id string) (cncdb.ArchRecord, error) {
