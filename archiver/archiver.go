@@ -104,10 +104,6 @@ func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error
 	return job.dbArch.LoadRecordsByID(concID)
 }
 
-func (job *ArchKeeper) LoadConcCacheRecordByID(concID string) (cncdb.ArchRecord, error) {
-	return job.redis.GetConcCacheRecord(concID)
-}
-
 // handleImplicitReq returns true if everything was ok, otherwise
 // false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(

@@ -18,6 +18,7 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cache"
 	"camus/cncdb"
 	"fmt"
 	"net/http"
@@ -54,7 +55,8 @@ func (v visitedIds) IDList() []string {
 // ------
 
 type Actions struct {
-	ArchKeeper *archiver.ArchKeeper
+	ArchKeeper   *archiver.ArchKeeper
+	CacheHandler *cache.CacheHandler
 }
 
 func (a *Actions) Overview(ctx *gin.Context) {
@@ -159,7 +161,7 @@ func (a *Actions) DedupReset(ctx *gin.Context) {
 }
 
 func (a *Actions) GetConcCacheRecord(ctx *gin.Context) {
-	rec, err := a.ArchKeeper.LoadConcCacheRecordByID(ctx.Param("id"))
+	rec, err := a.CacheHandler.LoadConcCacheRecordByID(ctx.Param("id"))
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
