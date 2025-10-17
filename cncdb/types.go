@@ -46,11 +46,20 @@ func (rec GeneralDataRecord) GetCorpora() []string {
 	if !ok {
 		return []string{}
 	}
-	typedV, ok := v.([]string)
+	typedV, ok := v.([]any)
 	if !ok {
 		return []string{}
 	}
-	return typedV
+	result := make([]string, 0, len(typedV))
+	for _, item := range typedV {
+		strItem, ok := item.(string)
+		if ok {
+			result = append(result, strItem)
+		} else {
+			return []string{}
+		}
+	}
+	return result
 }
 
 func (rec GeneralDataRecord) GetQuery() []string {
@@ -58,11 +67,20 @@ func (rec GeneralDataRecord) GetQuery() []string {
 	if !ok {
 		return []string{}
 	}
-	typedV, ok := v.([]string)
+	typedV, ok := v.([]any)
 	if !ok {
 		return []string{}
 	}
-	return typedV
+	result := make([]string, 0, len(typedV))
+	for _, item := range typedV {
+		strItem, ok := item.(string)
+		if ok {
+			result = append(result, strItem)
+		} else {
+			return []string{}
+		}
+	}
+	return result
 }
 
 // ----------------------------------
@@ -97,4 +115,12 @@ type HistoryRecord struct {
 
 func (qh *HistoryRecord) CreateIndexID() string {
 	return fmt.Sprintf("%d/%d/%s", qh.UserID, qh.Created, qh.QueryID)
+}
+
+// ----------------------------------
+
+type ConcCacheRecord struct {
+	ID    string
+	Key   string
+	Value string
 }

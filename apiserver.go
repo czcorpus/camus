@@ -18,6 +18,7 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cache"
 	"camus/cnf"
 	"camus/indexer"
 	"context"
@@ -51,13 +52,17 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.NoMethod(uniresp.NoMethodHandler)
 	engine.NoRoute(uniresp.NotFoundHandler)
 
-	archHandler := Actions{ArchKeeper: api.arch}
+	archHandler := Actions{
+		ArchKeeper:   api.arch,
+		CacheHandler: cache.NewCacheHandler(api.rdb),
+	}
 
 	engine.GET("/overview", archHandler.Overview)
 	engine.GET("/record/:id", archHandler.GetRecord)
 	engine.GET("/validate/:id", archHandler.Validate)
 	engine.POST("/fix/:id", archHandler.Fix)
 	engine.POST("/dedup-reset", archHandler.DedupReset)
+	engine.GET("/conc-cache/:id", archHandler.GetConcCacheRecord)
 
 	indexerHandler := indexer.NewActions(api.fulltextService)
 	engine.GET("/query-history/build", indexerHandler.IndexLatestRecords)
