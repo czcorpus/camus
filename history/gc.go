@@ -255,7 +255,7 @@ func (gc *GarbageCollector) RunAdHoc(
 			log.Info().
 				Int("userId", nextUserID).
 				Int64("numRemoved", numRemoved).
-				Msg("gargage-collected queries for user")
+				Msg("garbage-collected queries for user")
 		}
 		select {
 		case <-ctx.Done():

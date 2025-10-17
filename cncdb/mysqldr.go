@@ -34,11 +34,11 @@ func (db *MySQLConcArchDryRun) NewTransaction() (*sql.Tx, error) {
 	return db.db.NewTransaction()
 }
 
-func (db *MySQLConcArchDryRun) LoadRecentNRecords(num int) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) LoadRecentNRecords(num int) ([]RawRecord, error) {
 	return db.db.LoadRecentNRecords(num)
 }
 
-func (db *MySQLConcArchDryRun) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]RawRecord, error) {
 	return db.db.LoadRecordsFromDate(fromDate, maxItems)
 }
 
@@ -46,11 +46,11 @@ func (db *MySQLConcArchDryRun) ContainsRecord(concID string) (bool, error) {
 	return db.db.ContainsRecord(concID)
 }
 
-func (db *MySQLConcArchDryRun) LoadRecordsByID(concID string) ([]ArchRecord, error) {
+func (db *MySQLConcArchDryRun) LoadRecordsByID(concID string) ([]RawRecord, error) {
 	return db.db.LoadRecordsByID(concID)
 }
 
-func (db *MySQLConcArchDryRun) InsertRecord(rec ArchRecord) error {
+func (db *MySQLConcArchDryRun) InsertRecord(rec RawRecord) error {
 	log.Info().Msgf("DRY-RUN>>> InsertRecord(ArchRecord{ID: %s})", rec.ID)
 	return nil
 }
@@ -65,9 +65,9 @@ func (db *MySQLConcArchDryRun) RemoveRecordsByID(concID string) error {
 	return nil
 }
 
-func (db *MySQLConcArchDryRun) DeduplicateInArchive(curr []ArchRecord, rec ArchRecord) (ArchRecord, error) {
+func (db *MySQLConcArchDryRun) DeduplicateInArchive(curr []RawRecord, rec RawRecord) (RawRecord, error) {
 	log.Info().Msgf("DRY-RUN>>> DeduplicateInArchive(..., ArchRecord{ID: %s})", rec.ID)
-	return ArchRecord{}, nil
+	return RawRecord{}, nil
 }
 
 func (ops *MySQLConcArchDryRun) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {

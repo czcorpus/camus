@@ -25,7 +25,7 @@ import (
 
 type Deduplication struct {
 	NumMerged   int              `json:"numMerged"`
-	FinalRecord cncdb.ArchRecord `json:"finalRecord"`
+	FinalRecord cncdb.RawRecord `json:"finalRecord"`
 	error       error
 }
 
@@ -41,7 +41,7 @@ func (dedup Deduplication) MarshalJSON() ([]byte, error) {
 	return json.Marshal(
 		struct {
 			NumMerged   int              `json:"numMerged"`
-			FinalRecord cncdb.ArchRecord `json:"finalRecord"`
+			FinalRecord cncdb.RawRecord `json:"finalRecord"`
 			Error       string           `json:"error,omitempty"`
 		}{
 			NumMerged:   dedup.NumMerged,

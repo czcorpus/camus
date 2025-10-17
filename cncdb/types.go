@@ -85,7 +85,7 @@ func (rec GeneralDataRecord) GetQuery() []string {
 
 // ----------------------------------
 
-type ArchRecord struct {
+type RawRecord struct {
 	ID         string
 	Data       string
 	Created    time.Time
@@ -94,13 +94,28 @@ type ArchRecord struct {
 	Permanent  int
 }
 
-func (rec ArchRecord) FetchData() (GeneralDataRecord, error) {
+func (rec RawRecord) FetchData() (GeneralDataRecord, error) {
 	ans := make(GeneralDataRecord)
 	err := json.Unmarshal([]byte(rec.Data), &ans)
 	if err != nil {
 		return GeneralDataRecord{}, fmt.Errorf("failed to fetch ArchRecord data: %w", err)
 	}
 	return ans, nil
+}
+
+// -------------------------
+
+type CorpBoundRawRecord struct {
+	RawRecord RawRecord
+	Corpname  string
+}
+
+func (cbrec CorpBoundRawRecord) FetchData() (GeneralDataRecord, error) {
+	return cbrec.RawRecord.FetchData()
+}
+
+func (cbrec CorpBoundRawRecord) ID() string {
+	return cbrec.RawRecord.ID
 }
 
 // ----------------------------------
@@ -110,7 +125,7 @@ type HistoryRecord struct {
 	UserID  int    `json:"user_id"`
 	Created int64  `json:"created"`
 	Name    string `json:"name"`
-	Rec     *ArchRecord
+	Rec     *RawRecord
 }
 
 func (qh *HistoryRecord) CreateIndexID() string {

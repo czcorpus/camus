@@ -136,7 +136,7 @@ func (a *Actions) Fix(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
 	}
-	fixedRecs := make([]cncdb.ArchRecord, len(recs))
+	fixedRecs := make([]cncdb.RawRecord, len(recs))
 	for i, rec := range recs {
 		rec.Data = brokenConcRec1.ReplaceAllString(rec.Data, "")
 		fixedRecs[i] = rec

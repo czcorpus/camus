@@ -33,7 +33,7 @@ func TimeIsAtNight(t time.Time) bool {
 	return t.Hour() >= 22 || t.Hour() <= 5
 }
 
-func MergeRecords(recs []ArchRecord, newRec ArchRecord, tz *time.Location) ArchRecord {
+func MergeRecords(recs []RawRecord, newRec RawRecord, tz *time.Location) RawRecord {
 	if len(recs) == 0 {
 		panic("cannot merge empty slice of ArchRecords")
 	}
@@ -55,7 +55,7 @@ func MergeRecords(recs []ArchRecord, newRec ArchRecord, tz *time.Location) ArchR
 	return ans
 }
 
-func ValidateQueryInstances(variants []ArchRecord) error {
+func ValidateQueryInstances(variants []RawRecord) error {
 	if len(variants) < 2 {
 		return nil
 	}
