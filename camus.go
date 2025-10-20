@@ -18,6 +18,7 @@ package main
 
 import (
 	"camus/archiver"
+	"camus/cache"
 	"camus/cleaner"
 	"camus/cncdb"
 	"camus/cnf"
@@ -60,6 +61,7 @@ func createArchiver(
 	db cncdb.IConcArchOps,
 	rdb *archiver.RedisAdapter,
 	recsToIndex chan<- cncdb.HistoryRecord,
+	recsToStats chan<- cncdb.CorpBoundRawRecord,
 	reporting reporting.IReporting,
 	conf *cnf.Conf,
 ) *archiver.ArchKeeper {
@@ -74,6 +76,7 @@ func createArchiver(
 		db,
 		dedup,
 		recsToIndex,
+		recsToStats,
 		reporting,
 		conf.TimezoneLocation(),
 		conf.Archiver,
@@ -226,7 +229,8 @@ func main() {
 
 		// conc. archiver service:
 
-		arch := createArchiver(dbArchOps, rdb, recsToIndex, reportingService, conf)
+		recsToStats := make(chan cncdb.CorpBoundRawRecord, 100)
+		arch := createArchiver(dbArchOps, rdb, recsToIndex, recsToStats, reportingService, conf)
 
 		cln := cleaner.NewService(
 			archCleanerDbOps, rdb, reportingService, conf.Cleaner, conf.TimezoneLocation())
@@ -242,11 +246,13 @@ func main() {
 
 		fulltext := indexer.NewService(conf.Indexer, ftIndexer, rdb)
 
+		kCache := cache.NewCacheHandler(rdb)
+
 		as := &apiServer{
 			arch:            arch,
 			conf:            conf,
 			fulltextService: fulltext,
-			rdb:             rdb,
+			kCache:          kCache,
 		}
 
 		// query history garbage collector service
@@ -259,9 +265,16 @@ func main() {
 			conf.Indexer,
 		)
 
+		meter, err := cache.NewMeter(ctx, conf.QueryStatsPath, kCache, recsToStats)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to start the cache Meter service")
+			os.Exit(1)
+			return
+		}
+
 		// -------
 
-		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService, qHistGC}
+		services := []service{ftIndexer, arch, cln, fulltext, as, reportingService, qHistGC, meter}
 		for _, m := range services {
 			m.Start(ctx)
 		}

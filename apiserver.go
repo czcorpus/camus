@@ -37,7 +37,7 @@ type apiServer struct {
 	conf            *cnf.Conf
 	arch            *archiver.ArchKeeper
 	fulltextService *indexer.Service
-	rdb             *archiver.RedisAdapter
+	kCache          *cache.CacheHandler
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -54,7 +54,7 @@ func (api *apiServer) Start(ctx context.Context) {
 
 	archHandler := Actions{
 		ArchKeeper:   api.arch,
-		CacheHandler: cache.NewCacheHandler(api.rdb),
+		CacheHandler: api.kCache,
 	}
 
 	engine.GET("/overview", archHandler.Overview)

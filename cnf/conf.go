@@ -55,6 +55,7 @@ type Conf struct {
 	Indexer                *indexer.Conf       `json:"indexer"`
 	Cleaner                cleaner.Conf        `json:"cleaner"`
 	Reporting              hltscl.PgConf       `json:"reporting"`
+	QueryStatsPath         string              `json:"queryStatsPath"`
 }
 
 func (conf *Conf) TimezoneLocation() *time.Location {

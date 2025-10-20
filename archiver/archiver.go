@@ -51,6 +51,7 @@ type ArchKeeper struct {
 	tz          *time.Location
 	stats       reporting.OpStats
 	recsToIndex chan<- cncdb.HistoryRecord
+	recsToStats chan<- cncdb.CorpBoundRawRecord
 }
 
 // Start starts the ArchKeeper service
@@ -76,6 +77,7 @@ func (job *ArchKeeper) Start(ctx context.Context) {
 func (job *ArchKeeper) Stop(ctx context.Context) error {
 	log.Warn().Msg("stopping ArchKeeper task")
 	close(job.recsToIndex)
+	close(job.recsToStats)
 	if err := job.dedup.OnClose(); err != nil {
 		return fmt.Errorf("failed to stop ArchKeeper properly: %w", err)
 	}
@@ -100,14 +102,14 @@ func (job *ArchKeeper) GetStats() reporting.OpStats {
 	return job.stats
 }
 
-func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.ArchRecord, error) {
+func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.RawRecord, error) {
 	return job.dbArch.LoadRecordsByID(concID)
 }
 
 // handleImplicitReq returns true if everything was ok, otherwise
 // false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(
-	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) bool {
+	rec cncdb.RawRecord, item queueRecord, currStats *reporting.OpStats) bool {
 
 	match, err := job.dedup.TestAndSolve(rec)
 	if err != nil {
@@ -143,7 +145,7 @@ func (job *ArchKeeper) handleImplicitReq(
 }
 
 func (job *ArchKeeper) handleExplicitReq(
-	rec cncdb.ArchRecord, item queueRecord, currStats *reporting.OpStats) {
+	rec cncdb.RawRecord, item queueRecord, currStats *reporting.OpStats) {
 	exists, err := job.dbArch.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
@@ -203,6 +205,25 @@ func (job *ArchKeeper) performCheck() error {
 			} else {
 				job.handleImplicitReq(rec, item, &currStats)
 			}
+
+			fdata, err := rec.FetchData()
+			var corp string
+
+			if err != nil {
+				log.Error().
+					Str("recordId", item.Key).
+					Err(err).
+					Msg("failed to determine corpus, no query stats will be written")
+
+			} else {
+				if len(fdata.GetCorpora()) > 0 {
+					corp = fdata.GetCorpora()[0]
+				}
+				job.recsToStats <- cncdb.CorpBoundRawRecord{
+					RawRecord: rec,
+					Corpname:  corp,
+				}
+			}
 		case QRTypeHistory:
 			job.recsToIndex <- cncdb.HistoryRecord{
 				QueryID: item.Key,
@@ -227,7 +248,7 @@ func (job *ArchKeeper) performCheck() error {
 }
 
 func (job *ArchKeeper) DeduplicateInArchive(
-	curr []cncdb.ArchRecord, rec cncdb.ArchRecord) (cncdb.ArchRecord, error) {
+	curr []cncdb.RawRecord, rec cncdb.RawRecord) (cncdb.RawRecord, error) {
 	return job.dbArch.DeduplicateInArchive(curr, rec)
 }
 
@@ -236,6 +257,7 @@ func NewArchKeeper(
 	concArchDb cncdb.IConcArchOps,
 	dedup *Deduplicator,
 	recsToIndex chan<- cncdb.HistoryRecord,
+	recsToStats chan<- cncdb.CorpBoundRawRecord,
 	reporting reporting.IReporting,
 	tz *time.Location,
 	conf *Conf,
@@ -245,6 +267,7 @@ func NewArchKeeper(
 		dbArch:      concArchDb,
 		dedup:       dedup,
 		recsToIndex: recsToIndex,
+		recsToStats: recsToStats,
 		reporting:   reporting,
 		tz:          tz,
 		conf:        conf,

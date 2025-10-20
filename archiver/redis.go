@@ -208,7 +208,7 @@ func (rd *RedisAdapter) NextNArchItems(queueKey string, n int64) ([]queueRecord,
 	return ans, nil
 }
 
-func (rd *RedisAdapter) AddError(errQueue string, item queueRecord, rec *cncdb.ArchRecord) error {
+func (rd *RedisAdapter) AddError(errQueue string, item queueRecord, rec *cncdb.RawRecord) error {
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("failed to add error record %s: %w", item.Key, err)
@@ -233,15 +233,15 @@ func (rd *RedisAdapter) mkKey(id string) string {
 // GetConcRecord returns a concordance/wlist/pquery/kwords records
 // with a specified ID. In case no such record is found, ErrRecordNotFound
 // is returned.
-func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.ArchRecord, error) {
+func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.RawRecord, error) {
 	ans := rd.redis.Get(rd.ctx, rd.mkKey(id))
 	if ans.Err() == redis.Nil {
-		return cncdb.ArchRecord{}, cncdb.ErrRecordNotFound
+		return cncdb.RawRecord{}, cncdb.ErrRecordNotFound
 	}
 	if ans.Err() != nil {
-		return cncdb.ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
+		return cncdb.RawRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
 	}
-	return cncdb.ArchRecord{
+	return cncdb.RawRecord{
 		ID:   id,
 		Data: ans.Val(),
 	}, nil
@@ -251,31 +251,35 @@ func (rd *RedisAdapter) mkConcCacheKey(corpusId string) string {
 	return fmt.Sprintf("conc_cache:%s", strings.ToLower(corpusId))
 }
 
-func (rd *RedisAdapter) mkConcCacheField(corpusId string, q []string, cutoff int) string {
-	hashInput := strings.Join(q, "#") + corpusId + strconv.Itoa(cutoff)
+// mkConcCacheField is an exact rewrite of KonText's `_uniqname` function stored in
+// lib/plugins/default_conc_cache/__init__.py. It is important to keep this in sync as
+// otherwise, we won't be able to fetch KonText's cache records.
+func (rd *RedisAdapter) mkConcCacheField(corpusID string, q []string, cutoff int) string {
+	corpusIDLw := strings.ToLower(corpusID)
+	hashInput := strings.Join(q, "#") + corpusIDLw + strconv.Itoa(cutoff)
 	hash := sha1.Sum([]byte(hashInput))
 	return fmt.Sprintf("%x", hash)
 }
 
-func (rd *RedisAdapter) GetConcCacheRecord(id string) (cncdb.ArchRecord, error) {
+func (rd *RedisAdapter) GetConcCacheRawRecord(id string) (cncdb.RawRecord, error) {
 	concRecord, err := rd.GetConcRecord(id)
 	if err != nil {
-		return cncdb.ArchRecord{}, fmt.Errorf("failed to get concordance record: %w", err)
+		return cncdb.RawRecord{}, fmt.Errorf("failed to get concordance record: %w", err)
 	}
 	data, err := concRecord.FetchData()
 	if err != nil {
-		return cncdb.ArchRecord{}, fmt.Errorf("failed to fetch concordance record data: %w", err)
+		return cncdb.RawRecord{}, fmt.Errorf("failed to fetch concordance record data: %w", err)
 	}
 	corpusId := data.GetCorpora()[0]
 	field := rd.mkConcCacheField(corpusId, data.GetQuery(), 0)
 	ans := rd.redis.HGet(rd.ctx, rd.mkConcCacheKey(corpusId), field)
 	if ans.Err() == redis.Nil {
-		return cncdb.ArchRecord{}, cncdb.ErrRecordNotFound
+		return cncdb.RawRecord{ID: field}, cncdb.ErrRecordNotFound
 	}
 	if ans.Err() != nil {
-		return cncdb.ArchRecord{}, fmt.Errorf("failed to get conc_cache record: %w", ans.Err())
+		return cncdb.RawRecord{}, fmt.Errorf("failed to get conc_cache record: %w", ans.Err())
 	}
-	return cncdb.ArchRecord{
+	return cncdb.RawRecord{
 		ID:   field,
 		Data: ans.Val(),
 	}, nil
