@@ -239,7 +239,7 @@ func (idx *Indexer) Delete(recID string) error {
 	return idx.bleveIdx.Delete(recID)
 }
 
-func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.RawRecord, error) {
+func (idx *Indexer) GetConcRecord(queryID string) (*cncdb.QueryArchRec, error) {
 	rec, err := idx.rdb.GetConcRecord(queryID)
 	if err == cncdb.ErrRecordNotFound {
 		log.Info().Str("queryId", queryID).Msg("record not found in Redis, trying MySQL")

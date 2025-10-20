@@ -18,9 +18,9 @@ package main
 
 import (
 	"camus/archiver"
-	"camus/cache"
 	"camus/cnf"
 	"camus/indexer"
+	"camus/kcache"
 	"context"
 	"fmt"
 	"net/http"
@@ -37,7 +37,7 @@ type apiServer struct {
 	conf            *cnf.Conf
 	arch            *archiver.ArchKeeper
 	fulltextService *indexer.Service
-	kCache          *cache.CacheHandler
+	kCache          *kcache.CacheReader
 }
 
 func (api *apiServer) Start(ctx context.Context) {
@@ -53,8 +53,8 @@ func (api *apiServer) Start(ctx context.Context) {
 	engine.NoRoute(uniresp.NotFoundHandler)
 
 	archHandler := Actions{
-		ArchKeeper:   api.arch,
-		CacheHandler: api.kCache,
+		ArchKeeper:  api.arch,
+		CacheReader: api.kCache,
 	}
 
 	engine.GET("/overview", archHandler.Overview)

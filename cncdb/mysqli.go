@@ -30,14 +30,14 @@ type SubcProps struct {
 // database operations for concordance archive.
 type IConcArchOps interface {
 	NewTransaction() (*sql.Tx, error)
-	LoadRecentNRecords(num int) ([]RawRecord, error)
-	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]RawRecord, error)
+	LoadRecentNRecords(num int) ([]QueryArchRec, error)
+	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]QueryArchRec, error)
 	ContainsRecord(concID string) (bool, error)
-	LoadRecordsByID(concID string) ([]RawRecord, error)
-	InsertRecord(rec RawRecord) error
+	LoadRecordsByID(concID string) ([]QueryArchRec, error)
+	InsertRecord(rec QueryArchRec) error
 	UpdateRecordStatus(id string, status int) error
 	RemoveRecordsByID(concID string) error
-	DeduplicateInArchive(curr []RawRecord, rec RawRecord) (RawRecord, error)
+	DeduplicateInArchive(curr []QueryArchRec, rec QueryArchRec) (QueryArchRec, error)
 
 	// GetArchSizesByYears
 	// Without forceReload, the function refuses to perform actual query outside

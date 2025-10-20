@@ -18,8 +18,8 @@ package main
 
 import (
 	"camus/archiver"
-	"camus/cache"
 	"camus/cncdb"
+	"camus/kcache"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -55,8 +55,8 @@ func (v visitedIds) IDList() []string {
 // ------
 
 type Actions struct {
-	ArchKeeper   *archiver.ArchKeeper
-	CacheHandler *cache.CacheHandler
+	ArchKeeper  *archiver.ArchKeeper
+	CacheReader *kcache.CacheReader
 }
 
 func (a *Actions) Overview(ctx *gin.Context) {
@@ -136,7 +136,7 @@ func (a *Actions) Fix(ctx *gin.Context) {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return
 	}
-	fixedRecs := make([]cncdb.RawRecord, len(recs))
+	fixedRecs := make([]cncdb.QueryArchRec, len(recs))
 	for i, rec := range recs {
 		rec.Data = brokenConcRec1.ReplaceAllString(rec.Data, "")
 		fixedRecs[i] = rec
@@ -161,7 +161,7 @@ func (a *Actions) DedupReset(ctx *gin.Context) {
 }
 
 func (a *Actions) GetConcCacheRecord(ctx *gin.Context) {
-	rec, err := a.CacheHandler.LoadConcCacheRecordByID(ctx.Param("id"))
+	rec, err := a.CacheReader.GetConcCacheRecordByConcID(ctx.Param("id"))
 	if err != nil {
 		uniresp.RespondWithErrorJSON(ctx, err, http.StatusInternalServerError) // TODO
 		return

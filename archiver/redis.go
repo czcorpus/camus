@@ -208,7 +208,7 @@ func (rd *RedisAdapter) NextNArchItems(queueKey string, n int64) ([]queueRecord,
 	return ans, nil
 }
 
-func (rd *RedisAdapter) AddError(errQueue string, item queueRecord, rec *cncdb.RawRecord) error {
+func (rd *RedisAdapter) AddError(errQueue string, item queueRecord, rec *cncdb.QueryArchRec) error {
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("failed to add error record %s: %w", item.Key, err)
@@ -233,15 +233,15 @@ func (rd *RedisAdapter) mkKey(id string) string {
 // GetConcRecord returns a concordance/wlist/pquery/kwords records
 // with a specified ID. In case no such record is found, ErrRecordNotFound
 // is returned.
-func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.RawRecord, error) {
+func (rd *RedisAdapter) GetConcRecord(id string) (cncdb.QueryArchRec, error) {
 	ans := rd.redis.Get(rd.ctx, rd.mkKey(id))
 	if ans.Err() == redis.Nil {
-		return cncdb.RawRecord{}, cncdb.ErrRecordNotFound
+		return cncdb.QueryArchRec{}, cncdb.ErrRecordNotFound
 	}
 	if ans.Err() != nil {
-		return cncdb.RawRecord{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
+		return cncdb.QueryArchRec{}, fmt.Errorf("failed to get concordance record: %w", ans.Err())
 	}
-	return cncdb.RawRecord{
+	return cncdb.QueryArchRec{
 		ID:   id,
 		Data: ans.Val(),
 	}, nil
@@ -261,25 +261,27 @@ func (rd *RedisAdapter) mkConcCacheField(corpusID string, q []string, cutoff int
 	return fmt.Sprintf("%x", hash)
 }
 
-func (rd *RedisAdapter) GetConcCacheRawRecord(id string) (cncdb.RawRecord, error) {
+// GetConcCacheRawRecord gets a raw representation of conc. cache record
+// (i.e. without parsed data).
+func (rd *RedisAdapter) GetConcCacheRawRecord(id string) (ConcCacheRec, error) {
 	concRecord, err := rd.GetConcRecord(id)
 	if err != nil {
-		return cncdb.RawRecord{}, fmt.Errorf("failed to get concordance record: %w", err)
+		return ConcCacheRec{}, fmt.Errorf("failed to get concordance record: %w", err)
 	}
 	data, err := concRecord.FetchData()
 	if err != nil {
-		return cncdb.RawRecord{}, fmt.Errorf("failed to fetch concordance record data: %w", err)
+		return ConcCacheRec{}, fmt.Errorf("failed to fetch concordance record data: %w", err)
 	}
 	corpusId := data.GetCorpora()[0]
 	field := rd.mkConcCacheField(corpusId, data.GetQuery(), 0)
 	ans := rd.redis.HGet(rd.ctx, rd.mkConcCacheKey(corpusId), field)
 	if ans.Err() == redis.Nil {
-		return cncdb.RawRecord{ID: field}, cncdb.ErrRecordNotFound
+		return ConcCacheRec{ID: field}, cncdb.ErrRecordNotFound
 	}
 	if ans.Err() != nil {
-		return cncdb.RawRecord{}, fmt.Errorf("failed to get conc_cache record: %w", ans.Err())
+		return ConcCacheRec{}, fmt.Errorf("failed to get conc_cache record: %w", ans.Err())
 	}
-	return cncdb.RawRecord{
+	return ConcCacheRec{
 		ID:   field,
 		Data: ans.Val(),
 	}, nil

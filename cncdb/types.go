@@ -27,6 +27,11 @@ var (
 	ErrRecordNotFound = errors.New("record not found")
 )
 
+// GeneralDataRecord is a general representation of any
+// archived KonText query (concordance, word list, paradigmatic q.).
+// Internally, it is just a key-value map but it comes with
+// several methods allowing for unified access to involved
+// corpora and query.
 type GeneralDataRecord map[string]any
 
 func (rec GeneralDataRecord) GetPrevID() string {
@@ -85,7 +90,9 @@ func (rec GeneralDataRecord) GetQuery() []string {
 
 // ----------------------------------
 
-type RawRecord struct {
+// QueryArchRec is a representation of raw Redis (or MariaDB) conc-archive record.
+// The type holds record's unparsed JSON data along with ID and access metadata.
+type QueryArchRec struct {
 	ID         string
 	Data       string
 	Created    time.Time
@@ -94,7 +101,11 @@ type RawRecord struct {
 	Permanent  int
 }
 
-func (rec RawRecord) FetchData() (GeneralDataRecord, error) {
+// FetchData parses raw JSON data and returns the most general
+// representation - GeneralDataRecord - which is able to fetch common
+// properties no matter if the original query is a concordance one, word list one
+// or a paradimatic query one.
+func (rec QueryArchRec) FetchData() (GeneralDataRecord, error) {
 	ans := make(GeneralDataRecord)
 	err := json.Unmarshal([]byte(rec.Data), &ans)
 	if err != nil {
@@ -106,7 +117,7 @@ func (rec RawRecord) FetchData() (GeneralDataRecord, error) {
 // -------------------------
 
 type CorpBoundRawRecord struct {
-	RawRecord RawRecord
+	RawRecord QueryArchRec
 	Corpname  string
 }
 
@@ -125,7 +136,7 @@ type HistoryRecord struct {
 	UserID  int    `json:"user_id"`
 	Created int64  `json:"created"`
 	Name    string `json:"name"`
-	Rec     *RawRecord
+	Rec     *QueryArchRec
 }
 
 func (qh *HistoryRecord) CreateIndexID() string {

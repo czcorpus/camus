@@ -21,11 +21,18 @@ import (
 	"encoding/json"
 )
 
+// -----------------------
+
+type ConcCacheRec struct {
+	ID   string
+	Data string
+}
+
 // -------------------------
 
 type Deduplication struct {
-	NumMerged   int              `json:"numMerged"`
-	FinalRecord cncdb.RawRecord `json:"finalRecord"`
+	NumMerged   int                `json:"numMerged"`
+	FinalRecord cncdb.QueryArchRec `json:"finalRecord"`
 	error       error
 }
 
@@ -40,9 +47,9 @@ func (dedup Deduplication) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(
 		struct {
-			NumMerged   int              `json:"numMerged"`
-			FinalRecord cncdb.RawRecord `json:"finalRecord"`
-			Error       string           `json:"error,omitempty"`
+			NumMerged   int                `json:"numMerged"`
+			FinalRecord cncdb.QueryArchRec `json:"finalRecord"`
+			Error       string             `json:"error,omitempty"`
 		}{
 			NumMerged:   dedup.NumMerged,
 			FinalRecord: dedup.FinalRecord,
