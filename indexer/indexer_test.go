@@ -74,7 +74,7 @@ func TestEscaping(t *testing.T) {
 		Created: created.Unix(),
 		UserID:  1,
 		Name:    "test 1",
-		Rec: &cncdb.RawRecord{
+		Rec: &cncdb.QueryArchRec{
 			ID:         "foo",
 			Data:       string(rawForm),
 			Created:    created,

@@ -51,7 +51,7 @@ func (service *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (service *Service) GetRecord(ident string) (cncdb.RawRecord, error) {
+func (service *Service) GetRecord(ident string) (cncdb.QueryArchRec, error) {
 	return service.redis.GetConcRecord(ident)
 }
 

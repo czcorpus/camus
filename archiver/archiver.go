@@ -102,14 +102,14 @@ func (job *ArchKeeper) GetStats() reporting.OpStats {
 	return job.stats
 }
 
-func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.RawRecord, error) {
+func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.QueryArchRec, error) {
 	return job.dbArch.LoadRecordsByID(concID)
 }
 
 // handleImplicitReq returns true if everything was ok, otherwise
 // false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(
-	rec cncdb.RawRecord, item queueRecord, currStats *reporting.OpStats) bool {
+	rec cncdb.QueryArchRec, item queueRecord, currStats *reporting.OpStats) bool {
 
 	match, err := job.dedup.TestAndSolve(rec)
 	if err != nil {
@@ -145,7 +145,7 @@ func (job *ArchKeeper) handleImplicitReq(
 }
 
 func (job *ArchKeeper) handleExplicitReq(
-	rec cncdb.RawRecord, item queueRecord, currStats *reporting.OpStats) {
+	rec cncdb.QueryArchRec, item queueRecord, currStats *reporting.OpStats) {
 	exists, err := job.dbArch.ContainsRecord(rec.ID)
 	if err != nil {
 		currStats.NumErrors++
@@ -248,7 +248,7 @@ func (job *ArchKeeper) performCheck() error {
 }
 
 func (job *ArchKeeper) DeduplicateInArchive(
-	curr []cncdb.RawRecord, rec cncdb.RawRecord) (cncdb.RawRecord, error) {
+	curr []cncdb.QueryArchRec, rec cncdb.QueryArchRec) (cncdb.QueryArchRec, error) {
 	return job.dbArch.DeduplicateInArchive(curr, rec)
 }
 

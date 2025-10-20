@@ -53,7 +53,7 @@ type IndexableMidDoc interface {
 // specified ID is not found, the function should
 // return cncdb.ErrRecordNotFound
 type concDB interface {
-	GetConcRecord(id string) (cncdb.RawRecord, error)
+	GetConcRecord(id string) (cncdb.QueryArchRec, error)
 }
 
 func importConc(

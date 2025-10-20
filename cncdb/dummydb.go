@@ -29,23 +29,23 @@ func (dsql *DummyConcArchSQL) NewTransaction() (*sql.Tx, error) {
 	return nil, nil
 }
 
-func (dsql *DummyConcArchSQL) LoadRecentNRecords(num int) ([]RawRecord, error) {
-	return []RawRecord{}, nil
+func (dsql *DummyConcArchSQL) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
+	return []QueryArchRec{}, nil
 }
 
-func (dsql *DummyConcArchSQL) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]RawRecord, error) {
-	return []RawRecord{}, nil
+func (dsql *DummyConcArchSQL) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]QueryArchRec, error) {
+	return []QueryArchRec{}, nil
 }
 
 func (dsql *DummyConcArchSQL) ContainsRecord(concID string) (bool, error) {
 	return false, nil
 }
 
-func (dsql *DummyConcArchSQL) LoadRecordsByID(concID string) ([]RawRecord, error) {
-	return []RawRecord{}, nil
+func (dsql *DummyConcArchSQL) LoadRecordsByID(concID string) ([]QueryArchRec, error) {
+	return []QueryArchRec{}, nil
 }
 
-func (dsql *DummyConcArchSQL) InsertRecord(rec RawRecord) error {
+func (dsql *DummyConcArchSQL) InsertRecord(rec QueryArchRec) error {
 	return nil
 }
 
@@ -57,8 +57,8 @@ func (dsql *DummyConcArchSQL) RemoveRecordsByID(concID string) error {
 	return nil
 }
 
-func (dsql *DummyConcArchSQL) DeduplicateInArchive(curr []RawRecord, rec RawRecord) (RawRecord, error) {
-	return RawRecord{}, nil
+func (dsql *DummyConcArchSQL) DeduplicateInArchive(curr []QueryArchRec, rec QueryArchRec) (QueryArchRec, error) {
+	return QueryArchRec{}, nil
 }
 
 func (dsql *DummyConcArchSQL) GetArchSizesByYears(forceLoad bool) ([][2]int, error) {

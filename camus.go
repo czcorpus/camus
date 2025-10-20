@@ -18,12 +18,12 @@ package main
 
 import (
 	"camus/archiver"
-	"camus/cache"
 	"camus/cleaner"
 	"camus/cncdb"
 	"camus/cnf"
 	"camus/history"
 	"camus/indexer"
+	"camus/kcache"
 	"camus/reporting"
 	"context"
 	"flag"
@@ -246,7 +246,7 @@ func main() {
 
 		fulltext := indexer.NewService(conf.Indexer, ftIndexer, rdb)
 
-		kCache := cache.NewCacheHandler(rdb)
+		kCache := kcache.NewCacheReader(rdb)
 
 		as := &apiServer{
 			arch:            arch,
@@ -265,7 +265,7 @@ func main() {
 			conf.Indexer,
 		)
 
-		meter, err := cache.NewMeter(ctx, conf.QueryStatsPath, kCache, recsToStats)
+		meter, err := kcache.NewMeter(ctx, conf.QueryStatsPath, kCache, recsToStats)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to start the cache Meter service")
 			os.Exit(1)

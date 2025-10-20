@@ -118,7 +118,7 @@ func (dd *Deduplicator) TestRecord(concID string) bool {
 // The "recently used" means that we keep track of recently stored IDs and test
 // for them only. I.e. we do not perform full search in query persistence db
 // for each and every concID we want to store.
-func (dd *Deduplicator) TestAndSolve(newRec cncdb.RawRecord) (bool, error) {
+func (dd *Deduplicator) TestAndSolve(newRec cncdb.QueryArchRec) (bool, error) {
 	if !dd.TestRecord(newRec.ID) {
 		return false, nil
 	}
@@ -136,11 +136,11 @@ func (dd *Deduplicator) TestAndSolve(newRec cncdb.RawRecord) (bool, error) {
 		Str("concId", newRec.ID).
 		Int("numVariants", len(recs)).
 		Msg("found archived record")
-	queryTest := make(map[string][]cncdb.RawRecord)
+	queryTest := make(map[string][]cncdb.QueryArchRec)
 	for _, rec := range recs {
 		_, ok := queryTest[rec.Data]
 		if !ok {
-			queryTest[rec.Data] = make([]cncdb.RawRecord, 0, 10)
+			queryTest[rec.Data] = make([]cncdb.QueryArchRec, 0, 10)
 		}
 		queryTest[rec.Data] = append(queryTest[rec.Data], rec)
 	}

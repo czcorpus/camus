@@ -1,4 +1,4 @@
-package cache
+package kcache
 
 import (
 	"camus/cncdb"
@@ -23,8 +23,13 @@ type statsRecord struct {
 	Query    string  `json:"query"`
 }
 
+// -----------------------
+
+// Meter is a service which processes incoming CorpBoundRawRecord records
+// (= QueryArchRec and corpus ID together) and stores them to a file
+// for later processing by other tools (CQLizer).
 type Meter struct {
-	cacheHandler  *CacheHandler
+	cacheReader   *CacheReader
 	incoming      <-chan cncdb.CorpBoundRawRecord
 	statsFile     *os.File
 	statsFilePath string
@@ -119,7 +124,7 @@ func (meter *Meter) listenForData() {
 				log.Info().Msg("meter incoming channel closed, shutting down")
 				return
 			}
-			rec, err := meter.cacheHandler.LoadConcCacheRecordByID(item.ID())
+			rec, err := meter.cacheReader.GetConcCacheRecordByConcID(item.ID())
 			if err != nil {
 				log.Error().Err(err).Str("concId", item.ID()).Msg("failed to get conc archive record")
 				continue
@@ -185,7 +190,7 @@ func (meter *Meter) Stop(ctx context.Context) error {
 	}
 }
 
-func NewMeter(ctx context.Context, statsPath string, cache *CacheHandler, incData <-chan cncdb.CorpBoundRawRecord) (*Meter, error) {
+func NewMeter(ctx context.Context, statsPath string, cache *CacheReader, incData <-chan cncdb.CorpBoundRawRecord) (*Meter, error) {
 	// Check if dummy mode (empty statsPath means no writing)
 	dummyMode := statsPath == ""
 
@@ -216,7 +221,7 @@ func NewMeter(ctx context.Context, statsPath string, cache *CacheHandler, incDat
 	}
 
 	inst := &Meter{
-		cacheHandler:  cache,
+		cacheReader:   cache,
 		incoming:      incData,
 		statsFilePath: statsPath,
 		MaxFileSize:   50 * 1024 * 1024,

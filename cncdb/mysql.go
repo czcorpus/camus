@@ -57,13 +57,13 @@ func DBOpen(conf *DBConf) (*sql.DB, error) {
 	return db, nil
 }
 
-func generateRows(sqlRows *sql.Rows, expectedSize int) ([]RawRecord, error) {
-	ans := make([]RawRecord, 0, expectedSize)
+func generateRows(sqlRows *sql.Rows, expectedSize int) ([]QueryArchRec, error) {
+	ans := make([]QueryArchRec, 0, expectedSize)
 	for sqlRows.Next() {
-		var item RawRecord
+		var item QueryArchRec
 		err := sqlRows.Scan(&item.ID, &item.Data, &item.Created, &item.NumAccess, &item.LastAccess, &item.Permanent)
 		if err != nil {
-			return []RawRecord{}, fmt.Errorf("failed to load recent records: %w", err)
+			return []QueryArchRec{}, fmt.Errorf("failed to load recent records: %w", err)
 		}
 		ans = append(ans, item)
 	}
@@ -82,7 +82,7 @@ func (ops *MySQLConcArch) NewTransaction() (*sql.Tx, error) {
 	return ops.db.BeginTx(ops.ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 }
 
-func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]RawRecord, error) {
+func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner
 	// able to determine it from `order by created DESC limit X` ?)
@@ -97,12 +97,12 @@ func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]RawRecord, error) {
 			"WHERE created >= ? "+
 			"ORDER BY created DESC LIMIT ?", helperLimit, num)
 	if err != nil {
-		return []RawRecord{}, fmt.Errorf("failed to load recent records: %w", err)
+		return []QueryArchRec{}, fmt.Errorf("failed to load recent records: %w", err)
 	}
 	return generateRows(rows, num)
 }
 
-func (ops *MySQLConcArch) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]RawRecord, error) {
+func (ops *MySQLConcArch) LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]QueryArchRec, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT id, data, created, num_access, last_access, permanent "+
@@ -110,7 +110,7 @@ func (ops *MySQLConcArch) LoadRecordsFromDate(fromDate time.Time, maxItems int) 
 			"WHERE created >= ? "+
 			"ORDER BY created LIMIT ?", fromDate, maxItems)
 	if err != nil {
-		return []RawRecord{}, fmt.Errorf("failed to load records: %w", err)
+		return []QueryArchRec{}, fmt.Errorf("failed to load records: %w", err)
 	}
 	return generateRows(rows, maxItems)
 }
@@ -128,29 +128,29 @@ func (ops *MySQLConcArch) ContainsRecord(concID string) (bool, error) {
 	return ans, nil
 }
 
-func (ops *MySQLConcArch) LoadRecordsByID(concID string) ([]RawRecord, error) {
+func (ops *MySQLConcArch) LoadRecordsByID(concID string) ([]QueryArchRec, error) {
 	rows, err := ops.db.QueryContext(
 		ops.ctx,
 		"SELECT data, created, num_access, last_access, permanent "+
 			"FROM kontext_conc_persistence WHERE id = ?", concID)
 	if err != nil {
-		return []RawRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
+		return []QueryArchRec{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
 	}
-	ans := make([]RawRecord, 0, 10)
+	ans := make([]QueryArchRec, 0, 10)
 	for rows.Next() {
-		item := RawRecord{ID: concID}
+		item := QueryArchRec{ID: concID}
 		err := rows.Scan(
 			&item.Data, &item.Created, &item.NumAccess, &item.LastAccess,
 			&item.Permanent)
 		if err != nil {
-			return []RawRecord{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
+			return []QueryArchRec{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
 		}
 		ans = append(ans, item)
 	}
 	return ans, nil
 }
 
-func (ops *MySQLConcArch) InsertRecord(rec RawRecord) error {
+func (ops *MySQLConcArch) InsertRecord(rec QueryArchRec) error {
 	_, err := ops.db.ExecContext(
 		ops.ctx,
 		"INSERT INTO kontext_conc_persistence (id, data, created, num_access, last_access, permanent) "+
@@ -190,10 +190,10 @@ func (ops *MySQLConcArch) RemoveRecordsByID(concID string) error {
 	return nil
 }
 
-func (ops *MySQLConcArch) DeduplicateInArchive(curr []RawRecord, rec RawRecord) (RawRecord, error) {
+func (ops *MySQLConcArch) DeduplicateInArchive(curr []QueryArchRec, rec QueryArchRec) (QueryArchRec, error) {
 	err := ops.RemoveRecordsByID(rec.ID)
 	if err != nil {
-		return RawRecord{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
+		return QueryArchRec{}, fmt.Errorf("failed to finish deduplication for %s: %w", rec.ID, err)
 	}
 	ans := MergeRecords(curr, rec, ops.tz)
 	err = ops.InsertRecord(ans)
