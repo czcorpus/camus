@@ -59,6 +59,7 @@ func DBOpen(conf *DBConf) (*sql.DB, error) {
 
 func generateRows(sqlRows *sql.Rows, expectedSize int) ([]QueryArchRec, error) {
 	ans := make([]QueryArchRec, 0, expectedSize)
+	defer sqlRows.Close()
 	for sqlRows.Next() {
 		var item QueryArchRec
 		err := sqlRows.Scan(&item.ID, &item.Data, &item.Created, &item.NumAccess, &item.LastAccess, &item.Permanent)
@@ -80,6 +81,23 @@ type MySQLConcArch struct {
 
 func (ops *MySQLConcArch) NewTransaction() (*sql.Tx, error) {
 	return ops.db.BeginTx(ops.ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+}
+
+func (ops *MySQLConcArch) CorpusSize(corpusID string) (int64, error) {
+	row := ops.db.QueryRowContext(
+		ops.ctx,
+		"SELECT size FROM corpora WHERE name = ?",
+		corpusID,
+	)
+	var ans sql.NullInt64
+	err := row.Scan(&ans)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get size of corpus %s: %w", corpusID, err)
+	}
+	if !ans.Valid {
+		return -1, fmt.Errorf("ailed to get size of corpus %s: NULL value", corpusID)
+	}
+	return ans.Int64, nil
 }
 
 func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
@@ -136,6 +154,7 @@ func (ops *MySQLConcArch) LoadRecordsByID(concID string) ([]QueryArchRec, error)
 	if err != nil {
 		return []QueryArchRec{}, fmt.Errorf("failed to get records with id %s: %w", concID, err)
 	}
+	defer rows.Close()
 	ans := make([]QueryArchRec, 0, 10)
 	for rows.Next() {
 		item := QueryArchRec{ID: concID}
@@ -220,6 +239,7 @@ func (ops *MySQLConcArch) GetArchSizesByYears(forceLoad bool) ([][2]int, error) 
 	if err != nil {
 		return [][2]int{}, fmt.Errorf("failed to fetch arch. sizes: %w", err)
 	}
+	defer rows.Close()
 	ans := make([][2]int, 0, 30)
 	for rows.Next() {
 		var v, year int
@@ -275,6 +295,7 @@ func (ops *MySQLQueryHist) GetAllUsersWithSomeRecords() ([]int, error) {
 	if err != nil {
 		return []int{}, fmt.Errorf("failed to get users with history: %w", err)
 	}
+	defer rows.Close()
 	ans := make([]int, 0, 4000)
 	for rows.Next() {
 		var userID int
@@ -336,6 +357,7 @@ func (ops *MySQLQueryHist) GetUserRecords(userID int, numItems int) ([]HistoryRe
 	if err != nil {
 		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 	}
+	defer rows.Close()
 	ans := make([]HistoryRecord, 0, numItems)
 	for rows.Next() {
 		hRec := HistoryRecord{UserID: userID}
@@ -366,6 +388,7 @@ func (ops *MySQLQueryHist) GetUserGarbageRecords(userID int) ([]HistoryRecord, e
 	if err != nil {
 		return []HistoryRecord{}, fmt.Errorf("failed to get user garbage history: %w", err)
 	}
+	defer rows.Close()
 	ans := make([]HistoryRecord, 0, 300)
 	for rows.Next() {
 		var hRec HistoryRecord
@@ -442,6 +465,7 @@ func (ops *MySQLQueryHist) LoadRecentNHistory(num int) ([]HistoryRecord, error) 
 	if err != nil {
 		return []HistoryRecord{}, fmt.Errorf("failed to get user query history: %w", err)
 	}
+	defer rows.Close()
 	ans := make([]HistoryRecord, 0, num)
 	for rows.Next() {
 		var hRec HistoryRecord
@@ -468,6 +492,7 @@ func (ops *MySQLQueryHist) GetPendingDeletionRecords(tx *sql.Tx, maxItems int) (
 	if err != nil {
 		return []HistoryRecord{}, fmt.Errorf("failed to get pending deletion history: %w", err)
 	}
+	defer rows.Close()
 	ans := make([]HistoryRecord, 0, maxItems)
 	for rows.Next() {
 		var hRec HistoryRecord

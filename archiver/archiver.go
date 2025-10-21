@@ -52,6 +52,10 @@ type ArchKeeper struct {
 	stats       reporting.OpStats
 	recsToIndex chan<- cncdb.HistoryRecord
 	recsToStats chan<- cncdb.CorpBoundRawRecord
+
+	// corpSizes is a cache for storing corpus sizes
+	// (otherwise loaded from cnc database)
+	corpSizes map[string]int64
 }
 
 // Start starts the ArchKeeper service
@@ -104,6 +108,19 @@ func (job *ArchKeeper) GetStats() reporting.OpStats {
 
 func (job *ArchKeeper) LoadRecordsByID(concID string) ([]cncdb.QueryArchRec, error) {
 	return job.dbArch.LoadRecordsByID(concID)
+}
+
+func (job *ArchKeeper) getCorpusSize(corpusID string) (int64, error) {
+	cs, ok := job.corpSizes[corpusID]
+	if !ok {
+		csAlt, err := job.dbArch.CorpusSize(corpusID)
+		if err != nil {
+			return -1, err
+		}
+		job.corpSizes[corpusID] = csAlt
+		cs = csAlt
+	}
+	return cs, nil
 }
 
 // handleImplicitReq returns true if everything was ok, otherwise
@@ -214,15 +231,23 @@ func (job *ArchKeeper) performCheck() error {
 					Str("recordId", item.Key).
 					Err(err).
 					Msg("failed to determine corpus, no query stats will be written")
-
-			} else {
-				if len(fdata.GetCorpora()) > 0 {
-					corp = fdata.GetCorpora()[0]
-				}
-				job.recsToStats <- cncdb.CorpBoundRawRecord{
-					RawRecord: rec,
-					Corpname:  corp,
-				}
+				continue
+			}
+			if len(fdata.GetCorpora()) > 0 {
+				corp = fdata.GetCorpora()[0]
+			}
+			corpSize, err := job.getCorpusSize(corp)
+			if err != nil {
+				log.Error().
+					Str("recordId", item.Key).
+					Err(err).
+					Msg("failed to determine corpus size, no query stats will be written")
+				continue
+			}
+			job.recsToStats <- cncdb.CorpBoundRawRecord{
+				RawRecord:  rec,
+				Corpname:   corp,
+				CorpusSize: corpSize,
 			}
 		case QRTypeHistory:
 			job.recsToIndex <- cncdb.HistoryRecord{

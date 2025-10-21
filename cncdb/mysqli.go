@@ -26,9 +26,23 @@ type SubcProps struct {
 	TextTypes map[string][]string
 }
 
+// --------
+
+type CorpusSizeProvider interface {
+	// CorpusSize should return actual corpus size in tokens.
+	// In Camus, this is used only for storing query stats, so
+	// if some implementation returns just 0, it should not
+	// cause Camus to break itself.
+	CorpusSize(corpusID string) (int64, error)
+}
+
+// --------
+
 // IConcArchOps is an abstract interface for high level
-// database operations for concordance archive.
+// database operations for concordance archive and related
+// data.
 type IConcArchOps interface {
+	CorpusSizeProvider
 	NewTransaction() (*sql.Tx, error)
 	LoadRecentNRecords(num int) ([]QueryArchRec, error)
 	LoadRecordsFromDate(fromDate time.Time, maxItems int) ([]QueryArchRec, error)
@@ -51,6 +65,8 @@ type IConcArchOps interface {
 	// with empty value (and without error).
 	GetSubcorpusProps(subcID string) (SubcProps, error)
 }
+
+//---------
 
 // IQHistArchOps is an abstract interface for high level
 // database operations for query history (which itself is kind

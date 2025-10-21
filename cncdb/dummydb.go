@@ -29,6 +29,13 @@ func (dsql *DummyConcArchSQL) NewTransaction() (*sql.Tx, error) {
 	return nil, nil
 }
 
+// CorpusSize
+// note: it should be save to return 0 as it is not used in any
+// calculation
+func (dsql *DummyConcArchSQL) CorpusSize(corpusID string) (int64, error) {
+	return 0, nil
+}
+
 func (dsql *DummyConcArchSQL) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	return []QueryArchRec{}, nil
 }

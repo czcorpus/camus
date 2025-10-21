@@ -25,13 +25,17 @@ import (
 
 // MySQLConcArchDryRun is a dry-run mode version of mysql adapter. It performs
 // read operations just like normal adapter but any modifying operation
-// just logs its information.
+// just logs itself.
 type MySQLConcArchDryRun struct {
 	db *MySQLConcArch
 }
 
 func (db *MySQLConcArchDryRun) NewTransaction() (*sql.Tx, error) {
 	return db.db.NewTransaction()
+}
+
+func (db *MySQLConcArchDryRun) CorpusSize(corpusID string) (int64, error) {
+	return db.db.CorpusSize(corpusID)
 }
 
 func (db *MySQLConcArchDryRun) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
