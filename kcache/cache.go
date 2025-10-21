@@ -40,12 +40,12 @@ type CacheEntry struct {
 	Readable  bool   `json:"readable"`
 	PID       int    `json:"pid"`
 
-	// Created is the creation UNIX time with seconds precision.
-	Created int64 `json:"created"`
+	// Created is the creation UNIX time with (system dependent) sub-second precision.
+	Created float64 `json:"created"`
 
-	// LastUpd is the latest update UNIX time with seconds precision.
-	LastUpd int64 `json:"last_upd"`
-	Error   error `json:"error,omitempty"`
+	// LastUpd is the latest update UNIX time with (system dependent) sub-second precision.
+	LastUpd float64 `json:"last_upd"`
+	Error   error   `json:"error,omitempty"`
 }
 
 // IsZero tests whether the record can be used for our purposes,
@@ -56,7 +56,7 @@ func (rec CacheEntry) IsProcessable() bool {
 
 func (rec CacheEntry) ProcTime() float64 {
 	if rec.IsProcessable() {
-		return float64(rec.LastUpd) - float64(rec.Created)
+		return rec.LastUpd - rec.Created
 	}
 	return -1
 }
