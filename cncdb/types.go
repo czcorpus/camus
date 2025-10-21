@@ -117,8 +117,9 @@ func (rec QueryArchRec) FetchData() (GeneralDataRecord, error) {
 // -------------------------
 
 type CorpBoundRawRecord struct {
-	RawRecord QueryArchRec
-	Corpname  string
+	RawRecord  QueryArchRec
+	Corpname   string
+	CorpusSize int64
 }
 
 func (cbrec CorpBoundRawRecord) FetchData() (GeneralDataRecord, error) {
