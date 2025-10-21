@@ -296,5 +296,6 @@ func NewArchKeeper(
 		reporting:   reporting,
 		tz:          tz,
 		conf:        conf,
+		corpSizes:   make(map[string]int64),
 	}
 }
