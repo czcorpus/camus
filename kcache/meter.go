@@ -15,7 +15,8 @@ import (
 // ------------------------
 
 type statsRecord struct {
-	Corpus string `json:"corpus"`
+	Corpus     string `json:"corpus"`
+	CorpusSize int64  `json:"corpusSize"`
 	// TimeProc
 	// note: for now, we have only seconds accuracy but for future updates,
 	// we use float here.
@@ -141,9 +142,10 @@ func (meter *Meter) listenForData() {
 			}
 			if rec.IsProcessable() {
 				sr := &statsRecord{
-					Corpus:   item.Corpname,
-					TimeProc: rec.ProcTime(),
-					Query:    qChain[0],
+					Corpus:     item.Corpname,
+					CorpusSize: item.CorpusSize,
+					TimeProc:   rec.ProcTime(),
+					Query:      qChain[0],
 				}
 				if err := meter.writeStats(sr); err != nil {
 					log.Error().Err(err).Str("concId", item.ID()).Msg("failed to write stats data")
