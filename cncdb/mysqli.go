@@ -34,6 +34,8 @@ type CorpusSizeProvider interface {
 	// if some implementation returns just 0, it should not
 	// cause Camus to break itself.
 	CorpusSize(corpusID string) (int64, error)
+
+	SubcorpusSize(subcorpusID string) (int64, error)
 }
 
 // --------

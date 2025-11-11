@@ -123,6 +123,10 @@ func (job *ArchKeeper) getCorpusSize(corpusID string) (int64, error) {
 	return cs, nil
 }
 
+func (job *ArchKeeper) getSubcorpusSize(subcorpID string) (int64, error) {
+	return job.dbArch.SubcorpusSize(subcorpID)
+}
+
 // handleImplicitReq returns true if everything was ok, otherwise
 // false. Possible problems are logged.
 func (job *ArchKeeper) handleImplicitReq(
@@ -244,10 +248,24 @@ func (job *ArchKeeper) performCheck() error {
 					Msg("failed to determine corpus size, no query stats will be written")
 				continue
 			}
+			var subcSize int64
+			subc := fdata.GetSubcorpus()
+			if subc != "" {
+				subcSize, err = job.getSubcorpusSize(subc)
+				if err != nil {
+					log.Error().
+						Str("recordId", item.Key).
+						Str("subcorpusId", subc).
+						Err(err).
+						Msg("failed to apply subcorpus size, no query stats will be written")
+					continue
+				}
+			}
 			job.recsToStats <- cncdb.CorpBoundRawRecord{
-				RawRecord:  rec,
-				Corpname:   corp,
-				CorpusSize: corpSize,
+				RawRecord:     rec,
+				Corpname:      corp,
+				CorpusSize:    corpSize,
+				SubcorpusSize: subcSize,
 			}
 		case QRTypeHistory:
 			job.recsToIndex <- cncdb.HistoryRecord{
