@@ -30,8 +30,8 @@ var (
 // GeneralDataRecord is a general representation of any
 // archived KonText query (concordance, word list, paradigmatic q.).
 // Internally, it is just a key-value map but it comes with
-// several methods allowing for unified access to involved
-// corpora and query.
+// several methods allowing for unified access to key properties like
+// used (sub)corpora and search query.
 type GeneralDataRecord map[string]any
 
 func (rec GeneralDataRecord) GetPrevID() string {
@@ -44,6 +44,18 @@ func (rec GeneralDataRecord) GetPrevID() string {
 		return ""
 	}
 	return typedV
+}
+
+func (rec GeneralDataRecord) GetSubcorpus() string {
+	v, ok := rec["usesubcorp"]
+	if !ok {
+		return ""
+	}
+	typedV, ok := v.(string)
+	if ok {
+		return typedV
+	}
+	return ""
 }
 
 func (rec GeneralDataRecord) GetCorpora() []string {
@@ -117,9 +129,10 @@ func (rec QueryArchRec) FetchData() (GeneralDataRecord, error) {
 // -------------------------
 
 type CorpBoundRawRecord struct {
-	RawRecord  QueryArchRec
-	Corpname   string
-	CorpusSize int64
+	RawRecord     QueryArchRec
+	Corpname      string
+	CorpusSize    int64
+	SubcorpusSize int64
 }
 
 func (cbrec CorpBoundRawRecord) FetchData() (GeneralDataRecord, error) {

@@ -100,6 +100,23 @@ func (ops *MySQLConcArch) CorpusSize(corpusID string) (int64, error) {
 	return ans.Int64, nil
 }
 
+func (ops *MySQLConcArch) SubcorpusSize(subcID string) (int64, error) {
+	row := ops.db.QueryRowContext(
+		ops.ctx,
+		"SELECT size FROM kontext_subcorpus WHERE id = ?",
+		subcID,
+	)
+	var ans sql.NullInt64
+	err := row.Scan(&ans)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get size of subcorpus %s: %w", subcID, err)
+	}
+	if !ans.Valid {
+		return -1, fmt.Errorf("ailed to get size of subcorpus %s: NULL value", subcID)
+	}
+	return ans.Int64, nil
+}
+
 func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	// we use helperLimit to help partitioned table with millions of items
 	// to avoid going through all the partitions (or is the query planner

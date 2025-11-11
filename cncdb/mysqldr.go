@@ -38,6 +38,10 @@ func (db *MySQLConcArchDryRun) CorpusSize(corpusID string) (int64, error) {
 	return db.db.CorpusSize(corpusID)
 }
 
+func (db *MySQLConcArchDryRun) SubcorpusSize(subcID string) (int64, error) {
+	return db.db.SubcorpusSize(subcID)
+}
+
 func (db *MySQLConcArchDryRun) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	return db.db.LoadRecentNRecords(num)
 }

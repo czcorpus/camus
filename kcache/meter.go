@@ -15,13 +15,11 @@ import (
 // ------------------------
 
 type statsRecord struct {
-	Corpus     string `json:"corpus"`
-	CorpusSize int64  `json:"corpusSize"`
-	// TimeProc
-	// note: for now, we have only seconds accuracy but for future updates,
-	// we use float here.
-	TimeProc float64 `json:"timeProc"`
-	Query    string  `json:"query"`
+	Corpus        string  `json:"corpus"`
+	CorpusSize    int64   `json:"corpusSize"`
+	SubcorpusSize int64   `json:"subcorpusSize"`
+	TimeProc      float64 `json:"timeProc"`
+	Query         string  `json:"query"`
 }
 
 // -----------------------

@@ -36,6 +36,10 @@ func (dsql *DummyConcArchSQL) CorpusSize(corpusID string) (int64, error) {
 	return 0, nil
 }
 
+func (dsql *DummyConcArchSQL) SubcorpusSize(subcID string) (int64, error) {
+	return 0, nil
+}
+
 func (dsql *DummyConcArchSQL) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	return []QueryArchRec{}, nil
 }
