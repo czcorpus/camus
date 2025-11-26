@@ -21,10 +21,11 @@ import (
 )
 
 type OpStats struct {
-	NumErrors   int `json:"numErrors"`
-	NumMerged   int `json:"numMerged"`
-	NumInserted int `json:"numInserted"`
-	NumFetched  int `json:"numFetched"`
+	NumErrors      int `json:"numErrors"`
+	NumMerged      int `json:"numMerged"`
+	NumInserted    int `json:"numInserted"`
+	NumFetched     int `json:"numFetched"`
+	NumFlaggedSlow int `json:"numFlaggedSlow"`
 }
 
 func (bgs *OpStats) UpdateBy(other OpStats) {

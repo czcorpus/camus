@@ -33,6 +33,7 @@ create table camus_operations_stats (
   num_errors int,
   num_merged int,
   num_inserted int,
+  num_flagged_slow int,
   index_size int
 );
 
@@ -98,6 +99,7 @@ func (ds *StatusWriter) WriteOperationsStatus(item OpStats) {
 			Int("num_merged", item.NumMerged).
 			Int("num_errors", item.NumErrors).
 			Int("num_fetched", item.NumFetched).
+			Int("num_flagged_slow", item.NumFlaggedSlow).
 			Int("num_inserted", item.NumInserted)
 	}
 }

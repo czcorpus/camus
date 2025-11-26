@@ -20,6 +20,7 @@ type statsRecord struct {
 	SubcorpusSize int64   `json:"subcorpusSize,omitempty"`
 	TimeProc      float64 `json:"timeProc"`
 	Query         string  `json:"query"`
+	FlaggedAsSlow bool    `json:"flaggedAsSlow"`
 }
 
 // -----------------------
@@ -145,6 +146,7 @@ func (meter *Meter) listenForData() {
 					SubcorpusSize: item.SubcorpusSize,
 					TimeProc:      rec.ProcTime(),
 					Query:         qChain[0],
+					FlaggedAsSlow: item.FlaggedAsSlow,
 				}
 				if err := meter.writeStats(sr); err != nil {
 					log.Error().Err(err).Str("concId", item.ID()).Msg("failed to write stats data")
