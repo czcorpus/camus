@@ -20,6 +20,7 @@ import (
 	"camus/cncdb"
 	"camus/reporting"
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -229,6 +230,7 @@ func (job *ArchKeeper) performCheck() error {
 
 			fdata, err := rec.FetchData()
 			var corp string
+			var flaggedAsSlow bool
 
 			if err != nil {
 				log.Error().
@@ -237,6 +239,23 @@ func (job *ArchKeeper) performCheck() error {
 					Msg("failed to determine corpus, no query stats will be written")
 				continue
 			}
+
+			flaggedAsSlow = fdata.IsFlaggedAsSlow()
+			if flaggedAsSlow {
+				currStats.NumFlaggedSlow++
+			}
+			fdata.RemoveSlowFlag()
+			tmp, err := json.Marshal(fdata)
+			if err == nil {
+				rec.Data = string(tmp)
+
+			} else {
+				log.Error().
+					Str("recordId", rec.ID).
+					Err(err).
+					Msg("failed to reserialize GeneralDataRecord (removing slow flag)")
+			}
+
 			if len(fdata.GetCorpora()) > 0 {
 				corp = fdata.GetCorpora()[0]
 			}
@@ -266,6 +285,7 @@ func (job *ArchKeeper) performCheck() error {
 				Corpname:      corp,
 				CorpusSize:    corpSize,
 				SubcorpusSize: subcSize,
+				FlaggedAsSlow: flaggedAsSlow,
 			}
 		case QRTypeHistory:
 			job.recsToIndex <- cncdb.HistoryRecord{
@@ -283,6 +303,7 @@ func (job *ArchKeeper) performCheck() error {
 			Int("numMerged", currStats.NumMerged).
 			Int("numErrors", currStats.NumErrors).
 			Int("numFetched", numFetched).
+			Int("numFlaggedSlow", currStats.NumFlaggedSlow).
 			Msg("regular archiving report")
 	}
 	job.reporting.WriteOperationsStatus(currStats)

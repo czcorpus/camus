@@ -20,7 +20,10 @@ package indexer
 import (
 	"camus/cncdb"
 	"fmt"
+	"reflect"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // unspecifiedQueryRecord represents any query record as saved by
@@ -36,6 +39,21 @@ type unspecifiedQueryRecord struct {
 	SubcorpusID string         `json:"usesubcorp"`
 	LastopForm  map[string]any `json:"lastop_form"`
 	Form        map[string]any `json:"form"`
+}
+
+func (qr *unspecifiedQueryRecord) IsFlaggedAsSlow() bool {
+	v, ok := qr.Form["treat_as_slow_query"]
+	if !ok {
+		return false
+	}
+	typedVal, ok := v.(bool)
+	if !ok {
+		log.Warn().
+			Str("type", reflect.TypeOf(v).String()).
+			Msg("found conc query form entry treat_as_slow_query but with wrong type")
+		return false
+	}
+	return typedVal
 }
 
 // GetSupertype extracts query type (supertype in terms used by KonText sources) info.

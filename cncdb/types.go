@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -44,6 +46,41 @@ func (rec GeneralDataRecord) GetPrevID() string {
 		return ""
 	}
 	return typedV
+}
+
+func (rec GeneralDataRecord) IsFlaggedAsSlow() bool {
+	formData, ok := rec["lastop_form"]
+	if !ok {
+		return false
+	}
+	typedForm, ok := formData.(map[string]any)
+	if !ok {
+		log.Warn().Msg("treat_as_slow_query type problem - lastop_form is of a wrong type")
+		return false
+	}
+	flag, ok := typedForm["treat_as_slow_query"]
+	if !ok {
+		return false
+	}
+	typedFlag, ok := flag.(bool)
+	if !ok {
+		log.Warn().Msg("treat_as_slow_query type problem - the flag is of a wrong type")
+		return false
+	}
+	return typedFlag
+}
+
+func (rec GeneralDataRecord) RemoveSlowFlag() {
+	formData, ok := rec["lastop_form"]
+	if !ok {
+		return
+	}
+	typedForm, ok := formData.(map[string]any)
+	if !ok {
+		log.Warn().Msg("treat_as_slow_query type problem - lastop_form is of a wrong type")
+		return
+	}
+	delete(typedForm, "treat_as_slow_query")
 }
 
 func (rec GeneralDataRecord) GetSubcorpus() string {
@@ -133,6 +170,7 @@ type CorpBoundRawRecord struct {
 	Corpname      string
 	CorpusSize    int64
 	SubcorpusSize int64
+	FlaggedAsSlow bool
 }
 
 func (cbrec CorpBoundRawRecord) FetchData() (GeneralDataRecord, error) {

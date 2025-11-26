@@ -67,6 +67,8 @@ type concForm struct {
 	// CurrParsedQueries encodes KonText's TypeScript type:
 	// {[k:string]:Array<[Array<[string|Array<string>, string]>, boolean]>};
 	CurrParsedQueries map[string][]any `json:"curr_parsed_queries"`
+
+	TreatAsSlowQuery bool `json:"treat_as_slow_query"`
 }
 
 type wlistForm struct {
