@@ -134,6 +134,7 @@ func (ops *MySQLConcArch) LoadRecentNRecords(num int) ([]QueryArchRec, error) {
 	if err != nil {
 		return []QueryArchRec{}, fmt.Errorf("failed to load recent records: %w", err)
 	}
+	defer rows.Close()
 	return generateRows(rows, num)
 }
 
@@ -147,6 +148,7 @@ func (ops *MySQLConcArch) LoadRecordsFromDate(fromDate time.Time, maxItems int) 
 	if err != nil {
 		return []QueryArchRec{}, fmt.Errorf("failed to load records: %w", err)
 	}
+	defer rows.Close()
 	return generateRows(rows, maxItems)
 }
 
